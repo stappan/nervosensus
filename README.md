@@ -1,39 +1,29 @@
-# Sensory Neuron Cell Type Explorer
+# NervoSensus
 
-An interactive web application for exploring DRG & Trigeminal ganglion sensory neuron cell types.
+Interactive Sensory Neuron Cell Type Explorer.
 
 ## Features
 
-- **Card View**: Browse all cell types in a card-based layout with key information
-- **Tree View**: Hierarchical view organized by soma location and cell family
-- **Cluster View**: Interactive force-directed visualization to explore cell types by attributes (threshold phenotype, adaptation, axon type, species, soma location)
+- **Card View**: Browse all 88 cell types with source-colored accent borders
+- **Tree View**: Hierarchical view with toggle between Soma Location and Axon Phenotype
+- **Synthesis View**: Feature matrix table with source indicators
+- **Cluster View**: Force-directed visualization
+  - Default view shows cells colored by literature source
+  - Filter by phenotype, adaptation, axon type, species, soma location, source, and marker genes
+  - **"ALL" intersection** highlighted with yellow color, larger nodes, glow effect, filled background
+  - **"None" cluster** positioned in lower-right corner for easy identification
+- **Related Species Variants**: Navigate between species variants (via TEMP:subClassOf)
+- **Asserted Equivalence**: Click to view equivalent cell's card (via TEMP:mapsTo)
 
-## Data
+## Data Sources
 
-The default dataset contains 54 cell types across 18 families, including:
-- 4 species: mouse, human, macaque, guinea pig
-- 2 soma locations: dorsal root ganglion (DRG), trigeminal ganglion (TG)
-- Various phenotypes: heat-sensitive, cold-sensitive, proprioceptive, mechanosensitive (LTM/HTM)
+- **CSA paper** (54 cells) - Blue (#667eea)
+- **big DRG paper** (22 cells) - Orange (#f59e0b)  
+- **Ferreira et al., 2022** (12 cells) - Green (#22c55e)
 
 ## Usage
 
-Simply open `index.html` in a web browser. No server required.
-
-You can also upload your own NPO-formatted data using the "Load Data" button.
-
-## Data Format
-
-The application accepts NPO Template format (CSV or Excel) with these columns:
-- `Neuron ID`
-- `NPO Property`
-- `Union set number`
-- `nest intersection number` (for nested AND relationships)
-- `Property Value Label`
-- `NPO Property Value IRI`
-
-## Live Demo
-
-[View on GitHub Pages](https://YOUR_USERNAME.github.io/sensory-neuron-explorer/)
+Open `index.html` in a web browser. No server required.
 
 ## License
 

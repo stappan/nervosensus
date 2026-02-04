@@ -35,6 +35,40 @@
         .card-section { margin-top: 1rem; }
         .section-title { font-weight: 600; color: #4a5568; font-size: 0.85rem; margin-bottom: 0.5rem; }
         .gene-display { padding: 1rem; background: linear-gradient(135deg, #667eea15, #764ba215); border: 2px solid #667eea40; border-radius: 10px; font-size: 0.95rem; font-weight: 700; color: #2d3748; line-height: 1.6; }
+        
+        /* Filter Bar */
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.5rem; padding: 1rem; background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); align-items: center; }
+        .filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
+        .filter-label { font-size: 0.7rem; color: #718096; font-weight: 600; text-transform: uppercase; }
+        .filter-select { padding: 0.4rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; min-width: 120px; background: white; cursor: pointer; }
+        .filter-select:focus { outline: none; border-color: #667eea; }
+        .filter-clear { padding: 0.5rem 1rem; background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-left: auto; }
+        .filter-clear:hover { background: #fecaca; }
+        .filter-count { font-size: 0.85rem; color: #4a5568; padding: 0.5rem 1rem; background: #f0f4ff; border-radius: 6px; }
+        
+        /* Compact Accordion Cards */
+        .card-compact { background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border-left: 4px solid #667eea; margin-bottom: 0.75rem; overflow: hidden; transition: all 0.2s; }
+        .card-compact:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+        .card-compact-header { padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
+        .card-compact-header:hover { background: #f8fafc; }
+        .card-source-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .card-compact-info { flex: 1; min-width: 0; }
+        .card-compact-name { font-weight: 700; color: #2d3748; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-compact-meta { font-size: 0.8rem; color: #718096; margin-top: 0.2rem; }
+        .card-compact-badges { display: flex; gap: 0.4rem; flex-shrink: 0; }
+        .card-badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+        .card-badge.axon { background: #e0e7ff; color: #4338ca; }
+        .card-badge.equiv { background: #fef3c7; color: #92400e; }
+        .card-expand-btn { width: 24px; height: 24px; border: none; background: #edf2f7; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #718096; transition: all 0.2s; flex-shrink: 0; }
+        .card-expand-btn:hover { background: #667eea; color: white; }
+        .card-expand-btn.expanded { transform: rotate(180deg); }
+        .card-compact-detail { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .card-compact-detail.expanded { max-height: 1000px; }
+        .card-compact-detail-inner { padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+        
+        /* Cards grid for compact view */
+        .cards-compact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
         .modal.show { display: flex; align-items: center; justify-content: center; }
         .modal-content { background: white; border-radius: 16px; max-width: 800px; max-height: 90vh; overflow-y: auto; width: 90%; position: relative; }
@@ -86,6 +120,22 @@
         .tree-toggle-btn:hover { border-color: #667eea; color: #667eea; }
         .tree-toggle-btn.active { background: #667eea; color: white; border-color: #667eea; }
         .tree-soma-header.axon { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        
+        /* Improved Synthesis View */
+        .synthesis-controls { display: flex; gap: 1rem; padding: 1rem 1.5rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; align-items: center; flex-wrap: wrap; }
+        .synthesis-controls label { font-size: 0.8rem; color: #4a5568; font-weight: 600; }
+        .synthesis-controls select { padding: 0.4rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; }
+        .synthesis-group-header { background: linear-gradient(135deg, #667eea20, #764ba220); padding: 0.5rem 1rem; font-weight: 700; color: #2d3748; font-size: 0.9rem; position: sticky; top: 28px; z-index: 5; }
+        .synthesis-subgroup-header { background: #f1f5f9; padding: 0.4rem 1rem 0.4rem 2rem; font-weight: 600; color: #4a5568; font-size: 0.85rem; position: sticky; top: 56px; z-index: 4; }
+        .synthesis-table tr.has-equiv { background: linear-gradient(90deg, #fef3c7 0%, transparent 30%) !important; }
+        .synthesis-table tr.has-equiv:hover { background: linear-gradient(90deg, #fde68a 0%, #f7fafc 30%) !important; }
+        .synthesis-table td.equiv-cell { position: relative; }
+        .equiv-indicator { display: inline-block; width: 8px; height: 8px; background: #f59e0b; border-radius: 50%; margin-right: 0.5rem; }
+        .synthesis-table tr.equiv-highlight td { background: #fef3c7 !important; }
+        .synthesis-table th.sortable { cursor: pointer; user-select: none; }
+        .synthesis-table th.sortable:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1); }
+        .sort-indicator { margin-left: 0.3rem; font-size: 0.7rem; }
+
         .synthesis-container { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
         .synthesis-header { padding: 1.5rem; background: linear-gradient(135deg, #667eea15, #764ba215); border-bottom: 1px solid #e2e8f0; }
         .synthesis-header h2 { color: #2d3748; margin-bottom: 0.5rem; }
@@ -168,7 +218,60 @@
             <button class="view-btn" data-view="synthesis">📊 Synthesis View</button>
             <button class="view-btn" data-view="cluster">🔮 Cluster View</button>
         </div>
-        <div id="cardViewContainer"><div class="cards-grid" id="cardsContainer"></div></div>
+        <div id="cardViewContainer">
+            <div class="filter-bar" id="filterBar">
+                <div class="filter-group">
+                    <span class="filter-label">Source</span>
+                    <select class="filter-select" id="filterSource" onchange="applyCardFilters()">
+                        <option value="">All Sources</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Species</span>
+                    <select class="filter-select" id="filterSpecies" onchange="applyCardFilters()">
+                        <option value="">All Species</option>
+                        <option value="mouse">Mouse</option>
+                        <option value="human">Human</option>
+                        <option value="macaque">Macaque</option>
+                        <option value="guinea pig">Guinea Pig</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Axon Type</span>
+                    <select class="filter-select" id="filterAxon" onchange="applyCardFilters()">
+                        <option value="">All Types</option>
+                        <option value="fiber_a_beta">Aβ fiber</option>
+                        <option value="fiber_a_delta">Aδ fiber</option>
+                        <option value="fiber_c">C fiber</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Location</span>
+                    <select class="filter-select" id="filterLocation" onchange="applyCardFilters()">
+                        <option value="">All Locations</option>
+                        <option value="soma_drg">DRG</option>
+                        <option value="soma_tg">Trigeminal</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Gene</span>
+                    <select class="filter-select" id="filterGene" onchange="applyCardFilters()" style="min-width:150px;">
+                        <option value="">All Genes</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Equivalence</span>
+                    <select class="filter-select" id="filterEquiv" onchange="applyCardFilters()">
+                        <option value="">Any</option>
+                        <option value="yes">Has Equivalence</option>
+                        <option value="no">No Equivalence</option>
+                    </select>
+                </div>
+                <button class="filter-clear" onclick="clearCardFilters()">Clear Filters</button>
+                <span class="filter-count" id="cardCount">88 cells</span>
+            </div>
+            <div class="cards-compact-grid" id="cardsContainer"></div>
+        </div>
         <div id="treeViewContainer" style="display:none;">
             <div class="tree-container">
                 <div class="tree-controls">
@@ -183,7 +286,23 @@
             <div class="synthesis-container">
                 <div class="synthesis-header">
                     <h2>📊 Cell Type Synthesis</h2>
-                    <p>Common features across all cell types. Click a cell name to view details.</p>
+                    <p>Common features across all cell types. Click a cell name to view details. Cells with asserted equivalence are highlighted.</p>
+                </div>
+                <div class="synthesis-controls">
+                    <label>Group by:</label>
+                    <select id="synthesisGroupBy" onchange="renderSynthesisView()">
+                        <option value="species-axon">Species → Axon Type</option>
+                        <option value="axon-species">Axon Type → Species</option>
+                        <option value="source">Source</option>
+                        <option value="none">No Grouping</option>
+                    </select>
+                    <label style="margin-left:1rem;">Sort by:</label>
+                    <select id="synthesisSortBy" onchange="renderSynthesisView()">
+                        <option value="name">Cell Name</option>
+                        <option value="species" selected>Species</option>
+                        <option value="source">Source</option>
+                    </select>
+                    <label style="margin-left:1rem;"><input type="checkbox" id="synthesisHighlightEquiv" checked onchange="renderSynthesisView()"> Highlight Equivalences</label>
                 </div>
                 <div class="synthesis-table-wrapper">
                     <table class="synthesis-table" id="synthesisTable"></table>
@@ -295,8 +414,102 @@
         }
 
         function renderCards() { 
-            const c=document.getElementById('cardsContainer'); 
-            c.innerHTML=CELL_TYPES.map((ct,idx)=>`<div class="card" style="border-left-color:${ct.sourceColor||'#667eea'}" onclick="showModal(${idx})"><div class="card-header"><div class="card-title">${ct.preferredLabel}</div>${ct.sourceNomenclature?`<a href="${ct.sourceNomenclature}" target="_blank" class="card-source-link" onclick="event.stopPropagation()">📄 Source</a>`:''}</div><div class="card-body"><div class="card-entity">${ct.entity}</div><div style="margin-bottom:0.75rem;color:#718096;"><strong>Species:</strong> ${ct.species}${ct.somaLocations&&ct.somaLocations.length?`<br><strong>Location:</strong> ${ct.somaLocations.join(', ')}`:''}</div>${ct.fiberTypeString?`<div class="card-section"><div class="section-title">🔬 Axon Phenotype</div><div class="gene-display">${formatFiberType(formatGeneExpression(ct.fiberTypeStringAbbrev))}</div></div>`:''}${ct.geneExpressionString?`<div class="card-section"><div class="section-title">🧬 Marker Genes</div><div class="gene-display">${formatGeneExpression(ct.geneExpressionString)}</div></div>`:''}${ct.physiologyStringAbbrev?`<div class="card-section"><div class="section-title">⚡ Physiology</div><div class="gene-display">${formatGeneExpression(ct.physiologyStringAbbrev)}</div></div>`:''}</div></div>`).join(''); 
+            populateFilterDropdowns();
+            applyCardFilters();
+        }
+        
+        function populateFilterDropdowns() {
+            // Populate source dropdown
+            const sourceSelect = document.getElementById('filterSource');
+            const uniqueSources = [...new Set(CELL_TYPES.map(ct => ct.sourceNomenclatureLabel).filter(Boolean))];
+            sourceSelect.innerHTML = '<option value="">All Sources</option>' + 
+                uniqueSources.map(s => `<option value="${s}">${s}</option>`).join('');
+            
+            // Populate gene dropdown
+            const geneSelect = document.getElementById('filterGene');
+            geneSelect.innerHTML = '<option value="">All Genes</option>' + 
+                GENES.map(g => `<option value="${g.base}">${g.display}</option>`).join('');
+        }
+        
+        function applyCardFilters() {
+            const sourceFilter = document.getElementById('filterSource').value;
+            const speciesFilter = document.getElementById('filterSpecies').value;
+            const axonFilter = document.getElementById('filterAxon').value;
+            const locationFilter = document.getElementById('filterLocation').value;
+            const geneFilter = document.getElementById('filterGene').value;
+            const equivFilter = document.getElementById('filterEquiv').value;
+            
+            const filtered = CELL_TYPES.filter((ct, idx) => {
+                if (sourceFilter && ct.sourceNomenclatureLabel !== sourceFilter) return false;
+                if (speciesFilter && ct.species.toLowerCase() !== speciesFilter.toLowerCase()) return false;
+                if (axonFilter && !ct.clusterAttributes[axonFilter]) return false;
+                if (locationFilter && !ct.clusterAttributes[locationFilter]) return false;
+                if (geneFilter && (!ct.geneBaseNames || !ct.geneBaseNames.includes(geneFilter))) return false;
+                if (equivFilter === 'yes' && (!ct.mapsTo || ct.mapsTo.length === 0)) return false;
+                if (equivFilter === 'no' && ct.mapsTo && ct.mapsTo.length > 0) return false;
+                return true;
+            });
+            
+            document.getElementById('cardCount').textContent = filtered.length + ' cells';
+            
+            const c = document.getElementById('cardsContainer');
+            c.innerHTML = filtered.map((ct) => {
+                const idx = CELL_TYPES.indexOf(ct);
+                const axonBadge = (() => {
+                    if (ct.clusterAttributes.fiber_a_beta) return '<span class="card-badge axon">Aβ</span>';
+                    if (ct.clusterAttributes.fiber_a_delta) return '<span class="card-badge axon">Aδ</span>';
+                    if (ct.clusterAttributes.fiber_c) return '<span class="card-badge axon">C</span>';
+                    return '';
+                })();
+                const equivBadge = ct.mapsTo && ct.mapsTo.length > 0 ? '<span class="card-badge equiv">≡</span>' : '';
+                
+                return `<div class="card-compact" style="border-left-color:${ct.sourceColor||'#667eea'}" data-idx="${idx}">
+                    <div class="card-compact-header" onclick="toggleCardExpand(${idx})">
+                        <div class="card-source-dot" style="background:${ct.sourceColor||'#667eea'}" title="${ct.sourceNomenclatureLabel||''}"></div>
+                        <div class="card-compact-info">
+                            <div class="card-compact-name">${ct.preferredLabel}</div>
+                            <div class="card-compact-meta">${ct.species} • ${(ct.somaLocations||[]).join(', ') || 'Unknown location'}</div>
+                        </div>
+                        <div class="card-compact-badges">${axonBadge}${equivBadge}</div>
+                        <button class="card-expand-btn" id="expand-btn-${idx}">▼</button>
+                    </div>
+                    <div class="card-compact-detail" id="card-detail-${idx}">
+                        <div class="card-compact-detail-inner">
+                            ${ct.geneExpressionString ? `<div class="card-section"><div class="section-title">🧬 Marker Genes</div><div class="gene-display">${formatGeneExpression(ct.geneExpressionString)}</div></div>` : ''}
+                            ${ct.fiberTypeString ? `<div class="card-section"><div class="section-title">🔬 Axon Phenotype</div><div class="gene-display">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>` : ''}
+                            ${ct.physiologyString ? `<div class="card-section"><div class="section-title">⚡ Physiology</div><div class="gene-display">${formatGeneExpression(ct.physiologyString)}</div></div>` : ''}
+                            ${ct.relatedCells && ct.relatedCells.length > 0 ? `<div class="card-section"><div class="section-title">🔗 Related Variants</div><div class="related-cells">${ct.relatedCells.map(rc => `<button class="related-cell-btn" onclick="event.stopPropagation();showModalByName('${rc.label.replace(/'/g, "\\'")}')">${rc.label}</button>`).join('')}</div></div>` : ''}
+                            ${ct.mapsTo && ct.mapsTo.length > 0 ? `<div class="maps-to-section"><div class="maps-to-title">⚡ Asserted Equivalence</div><div class="related-cells">${ct.mapsTo.map(m => {
+                                const matchIdx = CELL_TYPES.findIndex(c => c.entity === m.label);
+                                return matchIdx !== -1 ? `<button class="related-cell-btn" onclick="event.stopPropagation();showModal(${matchIdx})">${m.label}</button>` : `<span style="color:#718096;">${m.label}</span>`;
+                            }).join('')}</div></div>` : ''}
+                            <button style="margin-top:1rem;padding:0.5rem 1rem;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;" onclick="event.stopPropagation();showModal(${idx})">View Full Details</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        
+        function toggleCardExpand(idx) {
+            const detail = document.getElementById('card-detail-' + idx);
+            const btn = document.getElementById('expand-btn-' + idx);
+            if (detail.classList.contains('expanded')) {
+                detail.classList.remove('expanded');
+                btn.classList.remove('expanded');
+            } else {
+                detail.classList.add('expanded');
+                btn.classList.add('expanded');
+            }
+        }
+        
+        function clearCardFilters() {
+            document.getElementById('filterSource').value = '';
+            document.getElementById('filterSpecies').value = '';
+            document.getElementById('filterAxon').value = '';
+            document.getElementById('filterLocation').value = '';
+            document.getElementById('filterGene').value = '';
+            document.getElementById('filterEquiv').value = '';
+            applyCardFilters();
         }
         
         function renderTreeView() {
@@ -372,6 +585,24 @@
         
         function renderSynthesisView() {
             const table = document.getElementById('synthesisTable');
+            const groupBy = document.getElementById('synthesisGroupBy')?.value || 'species-axon';
+            const sortBy = document.getElementById('synthesisSortBy')?.value || 'species';
+            const highlightEquiv = document.getElementById('synthesisHighlightEquiv')?.checked !== false;
+            
+            // Build equivalence map for highlighting
+            const equivMap = {};
+            CELL_TYPES.forEach((ct, idx) => {
+                if (ct.mapsTo && ct.mapsTo.length > 0) {
+                    ct.mapsTo.forEach(m => {
+                        const targetIdx = CELL_TYPES.findIndex(c => c.entity === m.label);
+                        if (targetIdx !== -1) {
+                            equivMap[idx] = targetIdx;
+                            equivMap[targetIdx] = idx;
+                        }
+                    });
+                }
+            });
+            
             const columns = [
                 { key: 'name', label: 'Cell Type', type: 'name' },
                 { key: 'source', label: 'Src', type: 'source' },
@@ -390,6 +621,55 @@
                 { key: 'slowly_adapting', label: 'SA', type: 'bool' },
             ];
             
+            // Sort cells
+            let sortedCells = [...CELL_TYPES].map((ct, idx) => ({...ct, origIdx: idx}));
+            sortedCells.sort((a, b) => {
+                if (sortBy === 'name') return a.preferredLabel.localeCompare(b.preferredLabel);
+                if (sortBy === 'species') return a.species.localeCompare(b.species);
+                if (sortBy === 'source') return (a.sourceNomenclatureLabel || '').localeCompare(b.sourceNomenclatureLabel || '');
+                return 0;
+            });
+            
+            // Group cells
+            let groups = {};
+            if (groupBy === 'species-axon') {
+                sortedCells.forEach(ct => {
+                    const species = ct.species || 'Unknown';
+                    let axon = 'Other';
+                    if (ct.clusterAttributes.fiber_a_beta) axon = 'Aβ fiber';
+                    else if (ct.clusterAttributes.fiber_a_delta) axon = 'Aδ fiber';
+                    else if (ct.clusterAttributes.fiber_c) axon = 'C fiber';
+                    
+                    const groupKey = species;
+                    const subKey = axon;
+                    if (!groups[groupKey]) groups[groupKey] = {};
+                    if (!groups[groupKey][subKey]) groups[groupKey][subKey] = [];
+                    groups[groupKey][subKey].push(ct);
+                });
+            } else if (groupBy === 'axon-species') {
+                sortedCells.forEach(ct => {
+                    let axon = 'Other';
+                    if (ct.clusterAttributes.fiber_a_beta) axon = 'Aβ fiber';
+                    else if (ct.clusterAttributes.fiber_a_delta) axon = 'Aδ fiber';
+                    else if (ct.clusterAttributes.fiber_c) axon = 'C fiber';
+                    
+                    const groupKey = axon;
+                    const subKey = ct.species || 'Unknown';
+                    if (!groups[groupKey]) groups[groupKey] = {};
+                    if (!groups[groupKey][subKey]) groups[groupKey][subKey] = [];
+                    groups[groupKey][subKey].push(ct);
+                });
+            } else if (groupBy === 'source') {
+                sortedCells.forEach(ct => {
+                    const groupKey = ct.sourceNomenclatureLabel || 'Unknown';
+                    if (!groups[groupKey]) groups[groupKey] = { 'all': [] };
+                    groups[groupKey]['all'].push(ct);
+                });
+            } else {
+                groups = { 'All Cells': { 'all': sortedCells } };
+            }
+            
+            // Build header
             let html = '<thead><tr>';
             columns.forEach(col => {
                 const cls = col.type === 'name' ? ' class="cell-name"' : '';
@@ -397,28 +677,85 @@
             });
             html += '</tr></thead><tbody>';
             
-            CELL_TYPES.forEach((ct, idx) => {
-                html += '<tr>';
-                columns.forEach(col => {
-                    if (col.type === 'name') {
-                        html += '<td class="cell-name" onclick="showModal(' + idx + ')">' + ct.preferredLabel + '</td>';
-                    } else if (col.type === 'source') {
-                        html += '<td><div style="width:12px;height:12px;border-radius:50%;background:' + (ct.sourceColor||'#667eea') + ';margin:auto;" title="' + (ct.sourceNomenclatureLabel||'') + '"></div></td>';
-                    } else if (col.type === 'text') {
-                        html += '<td>' + (ct[col.key] || '—') + '</td>';
-                    } else if (col.type === 'bool') {
-                        const val = ct.clusterAttributes && ct.clusterAttributes[col.key];
-                        html += '<td>' + (val ? '<span class="check-mark">✓</span>' : '<span class="dash-mark">—</span>') + '</td>';
+            // Build grouped rows
+            const groupOrder = groupBy === 'species-axon' ? ['human', 'mouse', 'macaque', 'guinea pig'] : 
+                              groupBy === 'axon-species' ? ['Aβ fiber', 'Aδ fiber', 'C fiber', 'Other'] :
+                              Object.keys(groups).sort();
+            
+            const subGroupOrder = groupBy === 'species-axon' ? ['Aβ fiber', 'Aδ fiber', 'C fiber', 'Other'] :
+                                 groupBy === 'axon-species' ? ['human', 'mouse', 'macaque', 'guinea pig'] :
+                                 null;
+            
+            groupOrder.forEach(groupKey => {
+                if (!groups[groupKey]) return;
+                
+                const subGroups = groups[groupKey];
+                const subKeys = subGroupOrder ? subGroupOrder.filter(k => subGroups[k]) : Object.keys(subGroups);
+                
+                // Group header row (spans all columns)
+                if (groupBy !== 'none') {
+                    html += '<tr class="synthesis-group-header"><td colspan="' + columns.length + '">' + 
+                        (groupKey.charAt(0).toUpperCase() + groupKey.slice(1)) + 
+                        ' (' + subKeys.reduce((sum, k) => sum + subGroups[k].length, 0) + ' cells)</td></tr>';
+                }
+                
+                subKeys.forEach(subKey => {
+                    const cells = subGroups[subKey];
+                    
+                    // Subgroup header (if not single group)
+                    if (subKey !== 'all' && groupBy !== 'none') {
+                        html += '<tr class="synthesis-subgroup-header"><td colspan="' + columns.length + '">' + 
+                            subKey + ' (' + cells.length + ')</td></tr>';
                     }
+                    
+                    // Cell rows
+                    cells.forEach(ct => {
+                        const hasEquiv = ct.mapsTo && ct.mapsTo.length > 0;
+                        const rowClass = (hasEquiv && highlightEquiv) ? 'has-equiv' : '';
+                        html += '<tr class="' + rowClass + '" data-idx="' + ct.origIdx + '" onmouseenter="highlightEquivPair(' + ct.origIdx + ')" onmouseleave="clearEquivHighlight()">';
+                        
+                        columns.forEach(col => {
+                            if (col.type === 'name') {
+                                const equivIndicator = hasEquiv ? '<span class="equiv-indicator" title="Has asserted equivalence"></span>' : '';
+                                html += '<td class="cell-name" onclick="showModal(' + ct.origIdx + ')">' + equivIndicator + ct.preferredLabel + '</td>';
+                            } else if (col.type === 'source') {
+                                html += '<td><div style="width:12px;height:12px;border-radius:50%;background:' + (ct.sourceColor||'#667eea') + ';margin:auto;" title="' + (ct.sourceNomenclatureLabel||'') + '"></div></td>';
+                            } else if (col.type === 'text') {
+                                html += '<td>' + (ct[col.key] || '—') + '</td>';
+                            } else if (col.type === 'bool') {
+                                const val = ct.clusterAttributes && ct.clusterAttributes[col.key];
+                                html += '<td>' + (val ? '<span class="check-mark">✓</span>' : '<span class="dash-mark">—</span>') + '</td>';
+                            }
+                        });
+                        html += '</tr>';
+                    });
                 });
-                html += '</tr>';
             });
             
             html += '</tbody>';
             table.innerHTML = html;
         }
+        
+        function highlightEquivPair(idx) {
+            const ct = CELL_TYPES[idx];
+            if (!ct.mapsTo || ct.mapsTo.length === 0) return;
+            
+            ct.mapsTo.forEach(m => {
+                const targetIdx = CELL_TYPES.findIndex(c => c.entity === m.label);
+                if (targetIdx !== -1) {
+                    const targetRow = document.querySelector('.synthesis-table tr[data-idx="' + targetIdx + '"]');
+                    if (targetRow) targetRow.classList.add('equiv-highlight');
+                }
+            });
+        }
+        
+        function clearEquivHighlight() {
+            document.querySelectorAll('.synthesis-table tr.equiv-highlight').forEach(row => {
+                row.classList.remove('equiv-highlight');
+            });
+        }
 
-        function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); svg.attr('width',width).attr('height',height); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,id:i,x:width/2+(Math.random()-0.5)*200,y:height/2+(Math.random()-0.5)*200,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).force('charge',d3.forceManyBody().strength(-40)).force('center',d3.forceCenter(width/2,height/2)).force('collision',d3.forceCollide().radius(d=>d.radius+2)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
+        function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); svg.attr('width',width).attr('height',height); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,id:i,x:width/2+(Math.random()-0.5)*200,y:height/2+(Math.random()-0.5)*200,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(width/2,height/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
         
         function clearAllFilters() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); updateClusterLegend(); updateClusterStats(); updateClusterVisualization(); }
         function updateSelectedDisplay() { const display=document.getElementById('selectedAttrsDisplay'); if(selectedAttributes.length===0){display.textContent='No attributes selected';}else{const labels=selectedAttributes.map(a=>{if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);return gene?gene.display:a;}return ATTR_LABELS[a]||a;});display.textContent=`Selected (${labels.length}): ${labels.join(', ')}`;} }
@@ -451,36 +788,82 @@
             const hasNone = keyArray.includes(noneKey);
             const hasAll = keyArray.includes(allKey);
             
-            const count=regularKeys.length + (hasNone ? 1 : 0) + (hasAll ? 1 : 0); 
-            const mx=w*0.15,my=h*0.12,uw=w-mx*2,uh=h-my*2;
+            // Count nodes per cluster to allocate space proportionally
+            const clusterSizes = {};
+            clusterNodes.forEach(n => {
+                const k = getClusterKey(n);
+                clusterSizes[k] = (clusterSizes[k] || 0) + 1;
+            });
             
-            // Position None in lower-right corner
+            const totalClusters = regularKeys.length + (hasNone ? 1 : 0) + (hasAll ? 1 : 0);
+            
+            // Use tighter margins to maximize usable space
+            const mx = w * 0.08, my = h * 0.08;
+            const uw = w - mx * 2, uh = h - my * 2;
+            
+            // Reserve corners for None and All
+            const noneCornerSize = hasNone ? 0.18 : 0;
+            const allTopSize = hasAll ? 0.15 : 0;
+            
+            // Position None in lower-right corner (isolated)
             if(hasNone) {
-                clusterCenters[noneKey] = {x: w - mx - uw*0.15, y: h - my - uh*0.15};
+                clusterCenters[noneKey] = {x: w - mx - uw * 0.12, y: h - my - uh * 0.12};
             }
             
-            // Position All in upper-left or center-top (prominent position)
+            // Position All in top-center (prominent position)
             if(hasAll) {
-                clusterCenters[allKey] = {x: mx + uw*0.5, y: my + uh*0.2};
+                clusterCenters[allKey] = {x: w / 2, y: my + uh * 0.12};
             }
             
-            // Position remaining clusters
-            if(regularKeys.length <= 4){
-                const positions=[{x:mx+uw*0.25,y:my+uh*0.5},{x:mx+uw*0.75,y:my+uh*0.35},{x:mx+uw*0.25,y:my+uh*0.75},{x:mx+uw*0.6,y:my+uh*0.7}];
-                regularKeys.forEach((k,i)=>{clusterCenters[k]=positions[i%positions.length];});
-            }else if(regularKeys.length<=9){
-                const cols=3;
+            // Calculate grid for remaining clusters with better distribution
+            const effectiveHeight = uh * (1 - allTopSize - noneCornerSize);
+            const startY = my + uh * (allTopSize + 0.05);
+            
+            if(regularKeys.length <= 2){
+                // Side by side
                 regularKeys.forEach((k,i)=>{
-                    const col=i%cols,row=Math.floor(i/cols);
-                    clusterCenters[k]={x:mx+uw*(col+0.5)/cols,y:my+uh*(row+0.5)/Math.ceil(regularKeys.length/cols)};
+                    clusterCenters[k] = {x: mx + uw * (0.3 + i * 0.4), y: startY + effectiveHeight * 0.4};
+                });
+            } else if(regularKeys.length <= 4){
+                // 2x2 grid with good spacing
+                const positions = [
+                    {x: mx + uw * 0.25, y: startY + effectiveHeight * 0.3},
+                    {x: mx + uw * 0.7, y: startY + effectiveHeight * 0.25},
+                    {x: mx + uw * 0.2, y: startY + effectiveHeight * 0.7},
+                    {x: mx + uw * 0.65, y: startY + effectiveHeight * 0.75}
+                ];
+                regularKeys.forEach((k,i)=>{clusterCenters[k]=positions[i];});
+            } else if(regularKeys.length <= 6){
+                // 2x3 grid
+                const cols = 3, rows = 2;
+                regularKeys.forEach((k,i)=>{
+                    const col = i % cols, row = Math.floor(i / cols);
+                    clusterCenters[k] = {
+                        x: mx + uw * (0.18 + col * 0.32),
+                        y: startY + effectiveHeight * (0.25 + row * 0.45)
+                    };
+                });
+            } else if(regularKeys.length <= 9){
+                // 3x3 grid
+                const cols = 3;
+                regularKeys.forEach((k,i)=>{
+                    const col = i % cols, row = Math.floor(i / cols);
+                    clusterCenters[k] = {
+                        x: mx + uw * (0.18 + col * 0.32),
+                        y: startY + effectiveHeight * (0.15 + row * 0.35)
+                    };
                 }); }else{
-                // For many clusters, use circle layout but keep None in lower-right and All in top-center
+                // For many clusters, use circle layout with better radius
+                const radius = Math.min(uw, uh) * 0.32;
+                const centerY = startY + effectiveHeight * 0.45;
                 regularKeys.forEach((k,i)=>{
-                    const angle=(2*Math.PI*i/regularKeys.length)-Math.PI/2;
-                    const radius=Math.min(uw,uh)*0.3;
-                    clusterCenters[k]={x:w/2+radius*Math.cos(angle),y:h/2+radius*Math.sin(angle)};
+                    const angle = (2 * Math.PI * i / regularKeys.length) - Math.PI/2;
+                    clusterCenters[k] = {
+                        x: w/2 + radius * Math.cos(angle),
+                        y: centerY + radius * Math.sin(angle) * 0.85
+                    };
                 }); } }
-        function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); clusterNodes.forEach(n=>n.radius=nodeRadius); calculateClusterCenters(width,height); if(enclosureTimer){clearTimeout(enclosureTimer);enclosureTimer=null;} if(selectedAttributes.length>0){clusterSimulation.force('x',d3.forceX(d=>clusterCenters[getClusterKey(d)]?.x||width/2).strength(0.6)).force('y',d3.forceY(d=>clusterCenters[getClusterKey(d)]?.y||height/2).strength(0.6)).force('charge',d3.forceManyBody().strength(-25)).force('collision',d3.forceCollide().radius(d=>d.radius+1));}else{clusterSimulation.force('x',d3.forceX(width/2).strength(0.05)).force('y',d3.forceY(height/2).strength(0.05)).force('charge',d3.forceManyBody().strength(-60)).force('collision',d3.forceCollide().radius(d=>d.radius+3));} clusterSimulation.alpha(0.8).restart(); const ns=svg.select('.nodes').selectAll('.cluster-node').data(clusterNodes,d=>d.id); const ne=ns.enter().append('circle').attr('class','cluster-node').attr('r',d=>d.radius).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded)).on('mouseover',showClusterTooltip).on('mousemove',moveClusterTooltip).on('mouseout',hideClusterTooltip).on('click',(e,d)=>showModal(d.id)); ns.merge(ne).transition().duration(300)
+        function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); clusterNodes.forEach(n=>n.radius=nodeRadius); calculateClusterCenters(width,height); if(enclosureTimer){clearTimeout(enclosureTimer);enclosureTimer=null;} if(selectedAttributes.length>0){clusterSimulation.force('x',d3.forceX(d=>clusterCenters[getClusterKey(d)]?.x||width/2).strength(0.85)).force('y',d3.forceY(d=>clusterCenters[getClusterKey(d)]?.y||height/2).strength(0.85)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.9));}else{clusterSimulation.force('x',d3.forceX(width/2).strength(0.05)).force('y',d3.forceY(height/2).strength(0.05)).force('charge',d3.forceManyBody().strength(-60)).force('collision',d3.forceCollide().radius(d=>d.radius+3));} clusterSimulation.alpha(0.8).restart(); const ns=svg.select('.nodes').selectAll('.cluster-node').data(clusterNodes,d=>d.id); const ne=ns.enter().append('circle').attr('class','cluster-node').attr('r',d=>d.radius).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded)).on('mouseover',showClusterTooltip).on('mousemove',moveClusterTooltip).on('mouseout',hideClusterTooltip).on('click',(e,d)=>showModal(d.id)); ns.merge(ne).transition().duration(300)
                 .attr('r', d => {
                     if(selectedAttributes.length >= 2) {
                         const mc = selectedAttributes.map(a => cellMatchesAttr(d, a)).filter(Boolean).length;
@@ -507,11 +890,11 @@
             
             scheduleEnclosureRedraw(); }
         function scheduleEnclosureRedraw() { if(enclosureTimer)clearTimeout(enclosureTimer); enclosureTimer=setTimeout(()=>{drawClusterEnclosures();enclosureTimer=setTimeout(()=>{drawClusterEnclosures();enclosureTimer=setTimeout(drawClusterEnclosures,800);},600);},400); }
-        function drawClusterEnclosures() { const svg=d3.select('#clusterSvg'); svg.select('.enclosures').selectAll('*').remove(); svg.select('.labels').selectAll('*').remove(); if(selectedAttributes.length===0)return; const clusters={}; clusterNodes.forEach(n=>{const k=getClusterKey(n);if(!clusters[k])clusters[k]=[];clusters[k].push(n);}); Object.entries(clusters).forEach(([key,nodes])=>{if(nodes.length===0)return; const pad=nodeRadius*1.8; const minX=d3.min(nodes,d=>d.x)-pad,maxX=d3.max(nodes,d=>d.x)+pad; const minY=d3.min(nodes,d=>d.y)-pad,maxY=d3.max(nodes,d=>d.y)+pad; const cx=(minX+maxX)/2,cy=(minY+maxY)/2; const rx=Math.max((maxX-minX)/2,nodeRadius*2.5); const ry=Math.max((maxY-minY)/2,nodeRadius*2.5); const color=getClusterColor(key),label=getClusterLabel(key); const isAllCluster = selectedAttributes.length >= 2 && key.split('').filter(c=>c==='1').length === selectedAttributes.length;
+        function drawClusterEnclosures() { const svg=d3.select('#clusterSvg'); svg.select('.enclosures').selectAll('*').remove(); svg.select('.labels').selectAll('*').remove(); if(selectedAttributes.length===0)return; const clusters={}; clusterNodes.forEach(n=>{const k=getClusterKey(n);if(!clusters[k])clusters[k]=[];clusters[k].push(n);}); Object.entries(clusters).forEach(([key,nodes])=>{if(nodes.length===0)return; const pad=nodeRadius*1.2; const minX=d3.min(nodes,d=>d.x)-pad,maxX=d3.max(nodes,d=>d.x)+pad; const minY=d3.min(nodes,d=>d.y)-pad,maxY=d3.max(nodes,d=>d.y)+pad; const cx=(minX+maxX)/2,cy=(minY+maxY)/2; const rx=Math.max((maxX-minX)/2,nodeRadius*2.5); const ry=Math.max((maxY-minY)/2,nodeRadius*2.5); const color=getClusterColor(key),label=getClusterLabel(key); const isAllCluster = selectedAttributes.length >= 2 && key.split('').filter(c=>c==='1').length === selectedAttributes.length;
                 svg.select('.enclosures').append('ellipse')
                     .attr('class', 'cluster-enclosure' + (isAllCluster ? ' all-enclosure' : ''))
                     .attr('cx',cx).attr('cy',cy)
-                    .attr('rx',rx+5).attr('ry',ry+5)
+                    .attr('rx',rx+2).attr('ry',ry+2)
                     .attr('stroke',color)
                     .attr('fill', isAllCluster ? 'rgba(255, 215, 0, 0.15)' : 'none'); const lt=`${label} (${nodes.length})`,ly=minY-6,tw=lt.length*5.5+12; svg.select('.labels').append('rect').attr('class','cluster-label-bg').attr('x',cx-tw/2).attr('y',ly-10).attr('width',tw).attr('height',16); svg.select('.labels').append('text').attr('class','cluster-label').attr('x',cx).attr('y',ly+2).attr('fill',color).text(lt);}); }
         function clusterTicked() { d3.select('#clusterSvg').select('.nodes').selectAll('.cluster-node').attr('cx',d=>d.x).attr('cy',d=>d.y); }

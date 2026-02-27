@@ -1518,20 +1518,25 @@ function renderLineageView() {
         const masterCenterY = groupStartY + (groupRows * nodeStep - verticalGap) / 2 - nodeHeight / 2;
         masterPositions[fam.name] = { x: col0X, y: masterCenterY, width: col0Width };
         
+        // Vertically center each column within the group height
+        const col1Offset = (groupRows - variants.length) * nodeStep / 2;
+        const col2Offset = (groupRows - groupBigDrg.length) * nodeStep / 2;
+        const col3Offset = (groupRows - groupCol3.length) * nodeStep / 2;
+
         // CSA variants
         variants.forEach((v, i) => {
-            positions[v.idx] = { x: col1X, y: groupStartY + i * nodeStep, width: col1Width };
+            positions[v.idx] = { x: col1X, y: groupStartY + col1Offset + i * nodeStep, width: col1Width };
         });
-        
+
         // bigDRG
         groupBigDrg.forEach((bd, i) => {
-            positions[bd.idx] = { x: col2X, y: groupStartY + i * nodeStep, width: col2Width };
+            positions[bd.idx] = { x: col2X, y: groupStartY + col2Offset + i * nodeStep, width: col2Width };
         });
-        
+
         // col3 — allow duplicates: use composite key "idx_familyName"
         groupCol3.forEach((c3, i) => {
             const key = c3.idx + '_' + fam.name;
-            positions[key] = { x: col3X, y: groupStartY + i * nodeStep, width: col3Width, realIdx: c3.idx };
+            positions[key] = { x: col3X, y: groupStartY + col3Offset + i * nodeStep, width: col3Width, realIdx: c3.idx };
         });
         
         // --- Connections ---

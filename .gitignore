@@ -1,0 +1,17 @@
+# Backup of original single-file version
+index_original.html
+
+# Excel data files
+*.xlsx
+*.xls
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/

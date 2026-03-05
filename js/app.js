@@ -30,6 +30,32 @@ const ATTR_SHORT = { source_0:'CSA paper', source_1:'big DRG paper', source_2:'T
 const SOURCE_URLS = {"source_0": "https://doi.org/10.1126/sciadv.adj9173", "source_1": "https://doi.org/10.1101/2025.11.05.686654", "source_2": "https://doi.org/10.1126/scitranslmed.abj8186", "source_3": "https://doi.org/10.1038/s41593-024-01794-1", "source_4": "https://doi.org/10.1038/s42003-025-08315-1", "source_5": "https://doi.org/10.1016/j.cell.2024.02.006", "source_6": "https://doi.org/10.1038/s41467-021-21725-z"};
 const PRECISION_BASE_URL = 'https://sparc.science/apps/precision-dashboard';
 const PRECISION_GENES = new Set(["ADORA2B", "ADRA2A", "ADRA2C", "AGT", "ALDH1A1", "ASIC1", "ATF3", "AVPR1A", "BMPR1B", "CACNA1I", "CACNG5", "CALB1", "CALCA", "CASQ2", "CCK", "CCKAR", "CDH9", "CHRNA3", "CHRNA7", "CPNE6", "CUX2", "DCN", "EPHA3", "ETV1", "FOXP2", "GFRA1", "GFRA2", "GFRA3", "GPR68", "GRM8", "GRXCR2", "HAPLN4", "HRH1", "IL31RA", "IL3RA", "KCNS1", "KIT", "LGI2", "MRGPRD", "MRGPRX1", "MRGPRX4", "NGEF", "NPPB", "NSG2", "NTRK2", "NTRK3", "OPRD1", "OPRK1", "OPRM1", "PCDH8", "PENK", "PIEZO2", "PNOC", "PROKR2", "PTGIR", "PTPRT", "PVALB", "REEP5", "RXFP1", "S100A16", "S100A4", "SCGN", "SCN10A", "SCN11A", "SLC18A3", "SST", "SSTR2", "STUM", "SYT17", "TAC1", "TAC3", "TH", "TRPA1", "TRPM2", "TRPM8", "TRPV1"]);
+// Atlas annotation → big DRG paper cell preferredLabel (from ilxtr:atlasAnnotation in PRECISIONcelltypeNPO.xlsx,
+// keyed by Column A Neuron ID, filtered to ilxtr:literatureCitation = "big DRG paper" only)
+const ATLAS_TO_CELL = {
+    "A-LTMR.TAC3": "DRG A-LTMR.TAC3 human neuron",
+    "A-PEP.CHRNA7/SLC18A3": "DRG A-PEP.CHRNA7 SLC18A3 human neuron",
+    "A-PEP.KIT": "DRG A-PEP.KIT human neuron",
+    "A-PEP.NTRK3/S100A16": "DRG A-PEP.NTRK3 S100A16 human neuron",
+    "A-PEP.SCGN/ADRA2C": "DRG A-PEP.SCGN ADRA2C human neuron",
+    "A-PEP.TAC1/CHRNA3": "DRG C-PEP.TAC1 CHRNA3 human neuron",
+    "A-Propr.EPHA3": "DRG A-Propr.EPHA3 human neuron",
+    "A-Propr.HAPLN4": "DRG A-Propr.HAPLN4 human neuron",
+    "A-Propr.PCDH8": "DRG A-Propr.PCDH8 human neuron",
+    "ATF3": "DRG ATF human neuron",
+    "Ab-LTMR.ETV1": "DRG Ab-LTMR.ETV1 human neuron",
+    "Ab-LTMR.LGI2": "DRG Ab-LTMR.LGI2 human neuron",
+    "Ab-LTMR.NSG2": "DRG Ab-LTMR.NSG2 human neuron",
+    "Ad.LTMR.CCKAR": "DRG Ab-LTMR.CCKAR human neuron",
+    "C-LTMR.CDH9": "DRG C-LTMR.CDH9 human neuron",
+    "C-NP.MRGPRX1/GFRA2": "DRG C-NP.MRGPRX1 GFRA2 human neuron",
+    "C-NP.MRGPRX1/MRGPRX4": "DRG C-NP.MRGPRX1 MRGPRX4 human neuron",
+    "C-NP.SST": "DRG C-NP.SST human neuron",
+    "C-PEP.ADORA2B": "DRG C-PEP.ADORA2B human neuron",
+    "C-PEP.TAC1/CACNG5": "DRG C-PEP.TAC1 CACNG5 human neuron",
+    "C-Thermo.RXFP1": "DRG C-Thermo.RXFP1 human neuron",
+    "C-Thermo.TRPM8": "DRG C-Thermo.TRPM8 human neuron"
+};
 const ATTR_COLORS = ['#667eea', '#f5576c', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 function formatGeneExpression(t) { return t ? t.replace(/(\w+)\^(\w+)/g, '$1<sup>$2</sup>') : ''; }
@@ -2032,6 +2058,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const gene = params.get('gene');
         const equiv = params.get('equiv');
         const cell = params.get('cell');
+        const atlasAnnotation = params.get('atlasannotation');
 
         // Switch view if specified (default to cards)
         if (view && ['cards','tree','synthesis','cluster','lineage'].includes(view)) {
@@ -2074,9 +2101,14 @@ document.addEventListener('DOMContentLoaded', () => {
             applyCardFilters();
         }
 
-        // Open a specific cell modal by preferred label
+        // Open a specific cell modal by preferred label or atlas annotation
         if (cell) {
             showModalByName(cell);
+        } else if (atlasAnnotation) {
+            const cellName = ATLAS_TO_CELL[atlasAnnotation];
+            if (cellName) {
+                showModalByName(cellName);
+            }
         }
     }
 });

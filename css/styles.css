@@ -61,16 +61,17 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 
 .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
 .modal.show { display: flex; align-items: center; justify-content: center; }
-.modal-content { background: white; border-radius: 16px; max-width: 800px; max-height: 90vh; overflow-y: auto; width: 90%; position: relative; }
-.modal-header { padding: 1.5rem; border-bottom: 2px solid #e2e8f0; }
-.modal-header h2 { color: #2d3748; }
-.modal-body { padding: 2rem; }
-.detail-section { margin-bottom: 2rem; }
-.detail-section h3 { color: #4a5568; margin-bottom: 1rem; font-size: 1.1rem; }
+.modal-content { background: white; border-radius: 16px; max-width: 800px; max-height: 90vh; width: 90%; position: relative; display: flex; flex-direction: column; }
+.modal-header { padding: 1rem 1.25rem; border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; background: white; z-index: 1; display: flex; align-items: center; justify-content: space-between; border-radius: 16px 16px 0 0; flex-shrink: 0; }
+.modal-header h2 { color: #2d3748; margin: 0; }
+.modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; }
+.detail-section { margin-bottom: 1rem; }
+.detail-section h3 { color: #4a5568; margin-bottom: 0.5rem; font-size: 0.95rem; }
+.detail-section p { margin: 0.2rem 0; }
 .gene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; }
 .gene-link { display: inline-block; padding: 0.5rem 1rem; background: #edf2f7; border-radius: 6px; text-decoration: none; color: #2d3748; font-weight: 600; font-size: 0.9rem; }
 .gene-link:hover { background: #667eea; color: white; }
-.close-btn { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 2rem; cursor: pointer; color: #718096; }
+.close-btn { background: none; border: none; font-size: 1.75rem; cursor: pointer; color: #718096; flex-shrink: 0; line-height: 1; padding: 0; }
 .source-link { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
 .source-link:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
 .related-cells { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
@@ -177,8 +178,8 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 
 
 /* Asserted Relationships styling */
-.asserted-relationships { margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, #fef3c7, #ede9fe); border: 2px solid #d97706; border-radius: 10px; }
-.asserted-relationships-title { font-weight: 700; color: #92400e; font-size: 0.95rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.asserted-relationships { margin-top: 0.5rem; padding: 0.6rem 0.75rem; background: linear-gradient(135deg, #fef3c7, #ede9fe); border: 1px solid #d97706; border-radius: 8px; }
+.asserted-relationships-title { font-weight: 700; color: #92400e; font-size: 0.9rem; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem; }
 .asserted-equiv-section { margin-bottom: 0.75rem; }
 .asserted-subtype-section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #d97706; }
 .asserted-label { font-size: 0.8rem; color: #78716c; font-weight: 600; margin-bottom: 0.3rem; }

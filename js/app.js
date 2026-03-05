@@ -28,6 +28,8 @@ let enclosureTimer = null;
 const ATTR_LABELS = { source_0:'CSA paper', source_1:'big DRG paper', source_2:'Tavares-Ferreira et al., 2022', source_3:'Yu et al., 2024', source_4:'Krauter et al., 2025', source_5:'Qi et al., 2024', source_6:'Kupari et al., 2021',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprioceptive', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'Guinea Pig', soma_drg:'DRG', soma_tg:'Trigeminal' };
 const ATTR_SHORT = { source_0:'CSA paper', source_1:'big DRG paper', source_2:'Tavares-Ferreira 2022', source_3:'Yu 2024', source_4:'Krauter 2025', source_5:'Qi 2024', source_6:'Kupari 2021',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprio', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'G.Pig', soma_drg:'DRG', soma_tg:'TG' };
 const SOURCE_URLS = {"source_0": "https://doi.org/10.1126/sciadv.adj9173", "source_1": "https://doi.org/10.1101/2025.11.05.686654", "source_2": "https://doi.org/10.1126/scitranslmed.abj8186", "source_3": "https://doi.org/10.1038/s41593-024-01794-1", "source_4": "https://doi.org/10.1038/s42003-025-08315-1", "source_5": "https://doi.org/10.1016/j.cell.2024.02.006", "source_6": "https://doi.org/10.1038/s41467-021-21725-z"};
+const PRECISION_BASE_URL = 'https://sparc.science/apps/precision-dashboard';
+const PRECISION_GENES = new Set(["ADORA2B", "ADRA2A", "ADRA2C", "AGT", "ALDH1A1", "ASIC1", "ATF3", "AVPR1A", "BMPR1B", "CACNA1I", "CACNG5", "CALB1", "CALCA", "CASQ2", "CCK", "CCKAR", "CDH9", "CHRNA3", "CHRNA7", "CPNE6", "CUX2", "DCN", "EPHA3", "ETV1", "FOXP2", "GFRA1", "GFRA2", "GFRA3", "GPR68", "GRM8", "GRXCR2", "HAPLN4", "HRH1", "IL31RA", "IL3RA", "KCNS1", "KIT", "LGI2", "MRGPRD", "MRGPRX1", "MRGPRX4", "NGEF", "NPPB", "NSG2", "NTRK2", "NTRK3", "OPRD1", "OPRK1", "OPRM1", "PCDH8", "PENK", "PIEZO2", "PNOC", "PROKR2", "PTGIR", "PTPRT", "PVALB", "REEP5", "RXFP1", "S100A16", "S100A4", "SCGN", "SCN10A", "SCN11A", "SLC18A3", "SST", "SSTR2", "STUM", "SYT17", "TAC1", "TAC3", "TH", "TRPA1", "TRPM2", "TRPM8", "TRPV1"]);
 const ATTR_COLORS = ['#667eea', '#f5576c', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 function formatGeneExpression(t) { return t ? t.replace(/(\w+)\^(\w+)/g, '$1<sup>$2</sup>') : ''; }
@@ -970,7 +972,7 @@ function togglePinnedRow(idx) {
 function highlightEquivPair(idx) { highlightRelationships(idx); }
 function clearEquivHighlight() { clearRelationshipHighlights(); }
 
-function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); svg.attr('width',width).attr('height',height); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,id:i,x:width/2+(Math.random()-0.5)*200,y:height/2+(Math.random()-0.5)*200,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(width/2,height/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
+function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); svg.attr('width',width).attr('height',height); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,id:i,x:width/2+(Math.random()-0.5)*width*0.6,y:height/2+(Math.random()-0.5)*height*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(width/2,height/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
 
 function clearAllFilters() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); updateClusterLegend(); updateClusterStats(); updateClusterVisualization(); }
 function updateSelectedDisplay() { const display=document.getElementById('selectedAttrsDisplay'); if(selectedAttributes.length===0){display.textContent='No attributes selected';}else{const labels=selectedAttributes.map(a=>{if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);return gene?gene.display:a;}return ATTR_LABELS[a]||a;});display.textContent=`Selected (${labels.length}): ${labels.join(', ')}`;} }
@@ -1082,7 +1084,7 @@ function calculateClusterCenters(w,h) {
                 y: centerY + radius * Math.sin(angle) * 0.85
             };
         }); } }
-function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); clusterNodes.forEach(n=>n.radius=nodeRadius); calculateClusterCenters(width,height); if(enclosureTimer){clearTimeout(enclosureTimer);enclosureTimer=null;} if(selectedAttributes.length>0){clusterSimulation.force('x',d3.forceX(d=>clusterCenters[getClusterKey(d)]?.x||width/2).strength(0.85)).force('y',d3.forceY(d=>clusterCenters[getClusterKey(d)]?.y||height/2).strength(0.85)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.9));}else{clusterSimulation.force('x',d3.forceX(width/2).strength(0.05)).force('y',d3.forceY(height/2).strength(0.05)).force('charge',d3.forceManyBody().strength(-60)).force('collision',d3.forceCollide().radius(d=>d.radius+3));} clusterSimulation.alpha(0.8).restart(); const ns=svg.select('.nodes').selectAll('.cluster-node').data(clusterNodes,d=>d.id); const ne=ns.enter().append('circle').attr('class','cluster-node').attr('r',d=>d.radius).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded)).on('mouseover',showClusterTooltip).on('mousemove',moveClusterTooltip).on('mouseout',hideClusterTooltip).on('click',(e,d)=>showModal(d.id)); ns.merge(ne).transition().duration(300)
+function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); clusterNodes.forEach(n=>n.radius=nodeRadius); calculateClusterCenters(width,height); if(enclosureTimer){clearTimeout(enclosureTimer);enclosureTimer=null;} if(selectedAttributes.length>0){clusterSimulation.force('radial',null).force('x',d3.forceX(d=>clusterCenters[getClusterKey(d)]?.x||width/2).strength(0.85)).force('y',d3.forceY(d=>clusterCenters[getClusterKey(d)]?.y||height/2).strength(0.85)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.9));}else{clusterSimulation.force('radial',null).force('x',d3.forceX(width/2).strength(0.3)).force('y',d3.forceY(height/2).strength(0.3)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+2).strength(0.8));} clusterSimulation.alpha(0.8).restart(); const ns=svg.select('.nodes').selectAll('.cluster-node').data(clusterNodes,d=>d.id); const ne=ns.enter().append('circle').attr('class','cluster-node').attr('r',d=>d.radius).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded)).on('mouseover',showClusterTooltip).on('mousemove',moveClusterTooltip).on('mouseout',hideClusterTooltip).on('click',(e,d)=>showModal(d.id)); ns.merge(ne).transition().duration(300)
         .attr('r', d => {
             if(selectedAttributes.length >= 2) {
                 const mc = selectedAttributes.map(a => cellMatchesAttr(d, a)).filter(Boolean).length;
@@ -1982,8 +1984,29 @@ function showModal(idx) {
     let mapsToHtml = assertedHtml;
     const sourceLinkHtml=ct.sourceNomenclature?`<div class="detail-section"><h3>📚 Source Publication</h3><a href="${ct.sourceNomenclature}" target="_blank" class="source-link">${getSourceLinkText(ct)} ↗</a></div>`:'';
     const sourceDataHtml = ct.sourceData && ct.sourceData.length > 0 ? `<div class="detail-section"><h3>📊 Source Data</h3>${ct.sourceData.map(sd => `<a href="${sd.uri}" target="_blank" class="source-link">${sd.label} ↗</a>`).join('<br>')}</div>` : '';
-    const notesHtml = (ct.alertNotes && ct.alertNotes.length > 0) || (ct.curatorNotes && ct.curatorNotes.length > 0) ? `<div class="detail-section"><h3>📝 Notes</h3><div style="padding:1rem;background:#fef9c3;border:2px solid #eab308;border-radius:8px;font-size:0.9rem;line-height:1.6;">${ct.alertNotes && ct.alertNotes.length > 0 ? `<div style="margin-bottom:${ct.curatorNotes && ct.curatorNotes.length > 0 ? '1rem' : '0'};"><strong style="color:#b45309;">⚠️ Alert Notes:</strong>${ct.alertNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}${ct.curatorNotes && ct.curatorNotes.length > 0 ? `<div><strong style="color:#1e40af;">📋 Curator Notes:</strong>${ct.curatorNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}</div></div>` : '';
-    document.getElementById('modalBody').innerHTML=`<div class="detail-section"><p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${ct.geneExpressionString?`<div class="detail-section"><h3>🧬 Marker Gene Expression</h3><div style="padding:1.5rem;background:linear-gradient(135deg,#667eea20,#764ba220);border:3px solid #667eea;border-radius:12px;font-size:1.25rem;font-weight:700;color:#2d3748;line-height:1.8;margin-bottom:1.5rem;">${formatGeneExpression(ct.geneExpressionString)}</div>${ct.markerGenes&&ct.markerGenes.length?`<h4 style="font-size:0.9rem;color:#718096;margin-bottom:0.75rem;">Individual Gene References:</h4><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''} ↗</a>`).join('')}</div>`:''}</div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype</h3><div style="padding:1rem;background:#f7fafc;border-radius:10px;font-size:1rem;font-weight:600;color:#2d3748;line-height:1.6;border:2px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology</h3><div style="padding:1.5rem;background:linear-gradient(135deg,#48bb7820,#38a16920);border:3px solid #48bb78;border-radius:12px;font-size:1.25rem;font-weight:700;color:#2d3748;line-height:1.8;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
+    // PRECISION Atlas — GeneXDistribution links for marker genes present in the PRECISION dataset
+    let precisionHtml = '';
+    if (ct.sourceNomenclatureLabel === 'big DRG paper' && ct.markerGenes && ct.markerGenes.length > 0) {
+        const seenGenes = new Set();
+        const precisionMarkers = [];
+        for (const g of ct.markerGenes) {
+            if (!g.name) continue;
+            const canonical = g.name.toUpperCase();
+            if (PRECISION_GENES.has(canonical) && !seenGenes.has(canonical)) {
+                seenGenes.add(canonical);
+                precisionMarkers.push(canonical);
+            }
+        }
+        if (precisionMarkers.length > 0) {
+            const buttons = precisionMarkers.map(gene => {
+                const url = `${PRECISION_BASE_URL}?view=GeneXDistribution&gene=${encodeURIComponent(gene)}&metadataColumn=${encodeURIComponent('Atlas_annotation')}`;
+                return `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 0.75rem;background:#f8f4ff;border:1px solid #c4b5fd;border-radius:6px;text-decoration:none;color:#5b21b6;font-size:0.85em;font-weight:500;transition:background 0.15s;" onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background='#f8f4ff'"><span style="font-family:monospace;">${gene}</span><span style="color:#7c3aed;font-size:0.9em;">↗</span></a>`;
+            });
+            precisionHtml = `<div class="detail-section"><h3>🧬 PRECISION Atlas — Gene Expression Distribution</h3><p style="font-size:0.82em;color:#64748b;margin:0 0 0.6rem;">View gene expression by cell type.</p><div style="display:flex;flex-wrap:wrap;gap:0.4rem;">${buttons.join('')}</div></div>`;
+        }
+    }
+    const notesHtml = (ct.alertNotes && ct.alertNotes.length > 0) || (ct.curatorNotes && ct.curatorNotes.length > 0) ? `<div class="detail-section"><h3>📝 Notes</h3><div style="padding:0.5rem 0.75rem;background:#fef9c3;border:1px solid #eab308;border-radius:6px;font-size:0.9rem;line-height:1.5;">${ct.alertNotes && ct.alertNotes.length > 0 ? `<div style="margin-bottom:${ct.curatorNotes && ct.curatorNotes.length > 0 ? '1rem' : '0'};"><strong style="color:#b45309;">⚠️ Alert Notes:</strong>${ct.alertNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}${ct.curatorNotes && ct.curatorNotes.length > 0 ? `<div><strong style="color:#1e40af;">📋 Curator Notes:</strong>${ct.curatorNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}</div></div>` : '';
+    document.getElementById('modalBody').innerHTML=`<div class="detail-section"><p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
     document.getElementById('modal').classList.add('show');
 }
 function showModalByName(name) { const idx=CELL_TYPES.findIndex(ct=>ct.preferredLabel===name); if(idx!==-1)showModal(idx); }
@@ -1996,4 +2019,64 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('modal').addEventListener('click',(e)=>{if(e.target.id==='modal')closeModal();});
     document.getElementById('uploadModal').addEventListener('click',(e)=>{if(e.target.id==='uploadModal')closeUploadModal();});
     document.querySelectorAll('.cluster-controls .attr-btn').forEach(btn=>{btn.addEventListener('click',()=>handleAttrClick(btn));});
+
+    // Deep-link support: parse URL parameters to set view and filters
+    // Example: ?view=cards&source=big+DRG+paper&species=mouse&axon=fiber_c&location=soma_drg&gene=Trpv1&equiv=yes&cell=CLTM1
+    const params = new URLSearchParams(window.location.search);
+    if (params.toString()) {
+        const view = params.get('view');
+        const source = params.get('source');
+        const species = params.get('species');
+        const axon = params.get('axon');
+        const location = params.get('location');
+        const gene = params.get('gene');
+        const equiv = params.get('equiv');
+        const cell = params.get('cell');
+
+        // Switch view if specified (default to cards)
+        if (view && ['cards','tree','synthesis','cluster','lineage'].includes(view)) {
+            switchView(view);
+        }
+
+        // Apply card-view filters by setting dropdown values
+        let filtersApplied = false;
+        if (source) {
+            const el = document.getElementById('filterSource');
+            const opt = [...el.options].find(o => o.value.toLowerCase() === source.toLowerCase());
+            if (opt) { el.value = opt.value; filtersApplied = true; }
+        }
+        if (species) {
+            const el = document.getElementById('filterSpecies');
+            const opt = [...el.options].find(o => o.value.toLowerCase() === species.toLowerCase());
+            if (opt) { el.value = opt.value; filtersApplied = true; }
+        }
+        if (axon) {
+            const el = document.getElementById('filterAxon');
+            const opt = [...el.options].find(o => o.value === axon);
+            if (opt) { el.value = opt.value; filtersApplied = true; }
+        }
+        if (location) {
+            const el = document.getElementById('filterLocation');
+            const opt = [...el.options].find(o => o.value === location);
+            if (opt) { el.value = opt.value; filtersApplied = true; }
+        }
+        if (gene) {
+            const el = document.getElementById('filterGene');
+            const opt = [...el.options].find(o => o.value.toLowerCase() === gene.toLowerCase());
+            if (opt) { el.value = opt.value; filtersApplied = true; }
+        }
+        if (equiv) {
+            const el = document.getElementById('filterEquiv');
+            if (equiv === 'yes' || equiv === 'no') { el.value = equiv; filtersApplied = true; }
+        }
+
+        if (filtersApplied) {
+            applyCardFilters();
+        }
+
+        // Open a specific cell modal by preferred label
+        if (cell) {
+            showModalByName(cell);
+        }
+    }
 });

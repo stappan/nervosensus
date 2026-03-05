@@ -1984,7 +1984,7 @@ function showModal(idx) {
     let mapsToHtml = assertedHtml;
     const sourceLinkHtml=ct.sourceNomenclature?`<div class="detail-section"><h3>📚 Source Publication</h3><a href="${ct.sourceNomenclature}" target="_blank" class="source-link">${getSourceLinkText(ct)} ↗</a></div>`:'';
     const sourceDataHtml = ct.sourceData && ct.sourceData.length > 0 ? `<div class="detail-section"><h3>📊 Source Data</h3>${ct.sourceData.map(sd => `<a href="${sd.uri}" target="_blank" class="source-link">${sd.label} ↗</a>`).join('<br>')}</div>` : '';
-    // PRECISION Atlas — GeneXDistribution links for marker genes present in the PRECISION dataset
+    // PRECISION Atlas — Gene Distribution links for marker genes present in the PRECISION dataset
     let precisionHtml = '';
     if (ct.sourceNomenclatureLabel === 'big DRG paper' && ct.markerGenes && ct.markerGenes.length > 0) {
         const seenGenes = new Set();
@@ -1999,7 +1999,7 @@ function showModal(idx) {
         }
         if (precisionMarkers.length > 0) {
             const buttons = precisionMarkers.map(gene => {
-                const url = `${PRECISION_BASE_URL}?view=GeneXDistribution&gene=${encodeURIComponent(gene)}&metadataColumn=${encodeURIComponent('Atlas_annotation')}`;
+                const url = `${PRECISION_BASE_URL}?dashboard=genedistribution&gene=${encodeURIComponent(gene)}&metadataColumn=${encodeURIComponent('Atlas_annotation')}`;
                 return `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 0.75rem;background:#f8f4ff;border:1px solid #c4b5fd;border-radius:6px;text-decoration:none;color:#5b21b6;font-size:0.85em;font-weight:500;transition:background 0.15s;" onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background='#f8f4ff'"><span style="font-family:monospace;">${gene}</span><span style="color:#7c3aed;font-size:0.9em;">↗</span></a>`;
             });
             precisionHtml = `<div class="detail-section"><h3>🧬 PRECISION Atlas — Gene Expression Distribution</h3><p style="font-size:0.82em;color:#64748b;margin:0 0 0.6rem;">View gene expression by cell type.</p><div style="display:flex;flex-wrap:wrap;gap:0.4rem;">${buttons.join('')}</div></div>`;

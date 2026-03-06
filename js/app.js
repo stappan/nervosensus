@@ -419,7 +419,7 @@ function initGeneButtons() {
 }
 
 function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); closeUploadModal(); selectedAttributes=[]; renderCards(); }
-function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); }
+function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); }
 
 
 function setTreeGrouping(grouping) {
@@ -2038,6 +2038,385 @@ function showModal(idx) {
 function showModalByName(name) { const idx=CELL_TYPES.findIndex(ct=>ct.preferredLabel===name); if(idx!==-1)showModal(idx); }
 function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
+// ===== Permalink Utilities =====
+function showPermalinkToast() {
+    const toast = document.getElementById('permalinkToast');
+    toast.style.display = 'block';
+    toast.style.opacity = '1';
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => { toast.style.display = 'none'; toast.style.opacity = '1'; }, 300); }, 2000);
+}
+
+function copyPermalink(paramsObj) {
+    const url = new URL(window.location.href.split('?')[0]);
+    for (const [k, v] of Object.entries(paramsObj)) {
+        if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
+    }
+    navigator.clipboard.writeText(url.toString()).then(() => showPermalinkToast());
+}
+
+function copyCardLink() {
+    const p = { view: 'cards' };
+    const source = document.getElementById('filterSource').value;
+    const species = document.getElementById('filterSpecies').value;
+    const axon = document.getElementById('filterAxon').value;
+    const location = document.getElementById('filterLocation').value;
+    const gene = document.getElementById('filterGene').value;
+    const equiv = document.getElementById('filterEquiv').value;
+    if (source) p.source = source;
+    if (species) p.species = species;
+    if (axon) p.axon = axon;
+    if (location) p.location = location;
+    if (gene) p.gene = gene;
+    if (equiv) p.equiv = equiv;
+    copyPermalink(p);
+}
+
+function copyTreeLink() {
+    copyPermalink({ view: 'tree', grouping: treeGrouping });
+}
+
+function copySynthesisLink() {
+    const p = { view: 'synthesis' };
+    p.groupBy = document.getElementById('synthesisGroupBy').value;
+    p.sortBy = document.getElementById('synthesisSortBy').value;
+    if (document.getElementById('synthesisHighlightEquiv').checked) p.highlightEquiv = 'true';
+    if (document.getElementById('synthesisHighlightSubtype').checked) p.highlightSubtype = 'true';
+    copyPermalink(p);
+}
+
+function copyClusterLink() {
+    const p = { view: 'cluster' };
+    if (selectedAttributes.length) p.attrs = selectedAttributes.join('|');
+    copyPermalink(p);
+}
+
+function copyLineageLink() {
+    copyPermalink({ view: 'lineage' });
+}
+
+// ===== Compare View =====
+let compareInitialized = false;
+let compareSelectedRow = null;
+
+function getDisplayLabel(ct) {
+    return ct.localLabel || ct.preferredLabel;
+}
+
+function getUniqueSources() {
+    return [...new Set(CELL_TYPES.map(ct => ct.sourceNomenclatureLabel).filter(Boolean))];
+}
+
+function getSourceColor(sourceLabel) {
+    const ct = CELL_TYPES.find(c => c.sourceNomenclatureLabel === sourceLabel);
+    return ct ? ct.sourceColor : '#718096';
+}
+
+function buildCompareData(anchorSource, compareSources) {
+    const rows = [];
+    CELL_TYPES.forEach((ct, idx) => {
+        if (ct.sourceNomenclatureLabel !== anchorSource) return;
+        const rels = getAssertedRelationships(idx);
+        const columns = {};
+        for (const cs of compareSources) {
+            columns[cs] = {
+                equivalences: rels.equivalences.filter(r => CELL_TYPES[r.idx].sourceNomenclatureLabel === cs),
+                subtypeOf: rels.subtypeOf.filter(r => CELL_TYPES[r.idx].sourceNomenclatureLabel === cs),
+                hasSubtypes: rels.hasSubtypes.filter(r => CELL_TYPES[r.idx].sourceNomenclatureLabel === cs)
+            };
+        }
+        rows.push({ anchorCell: ct, anchorIdx: idx, columns });
+    });
+    return rows;
+}
+
+function renderCompareTable(tableRows, compareSources) {
+    const wrapper = document.getElementById('compareTableWrapper');
+    if (!compareSources.length) {
+        wrapper.innerHTML = '<div class="compare-no-results">Select a comparison source to begin.</div>';
+        return;
+    }
+    if (!tableRows.length) {
+        wrapper.innerHTML = '<div class="compare-no-results">No cell types found for the selected anchor source.</div>';
+        return;
+    }
+
+    const anchorSource = tableRows[0].anchorCell.sourceNomenclatureLabel;
+    const anchorColor = getSourceColor(anchorSource);
+
+    let html = '<table class="compare-table"><thead><tr>';
+    html += '<th style="background:#718096;width:2rem;"></th>';
+    html += `<th style="background:${anchorColor};">${anchorSource}</th>`;
+    for (const cs of compareSources) {
+        html += `<th style="background:${getSourceColor(cs)};">${cs}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    for (const row of tableRows) {
+        const isSelected = compareSelectedRow === row.anchorIdx;
+        html += `<tr class="${isSelected ? 'compare-row-selected' : ''}" data-anchor-idx="${row.anchorIdx}">`;
+        html += `<td class="compare-expand-btn" onclick="toggleCompareDetail(${row.anchorIdx})">${isSelected ? '▼' : '▶'}</td>`;
+        html += `<td><span class="compare-cell-link" onclick="showModal(${row.anchorIdx})">${getDisplayLabel(row.anchorCell)}</span></td>`;
+
+        for (const cs of compareSources) {
+            const col = row.columns[cs];
+            const parts = [];
+
+            // Deduplicate by idx across relationship types
+            const seenIdx = new Set();
+
+            for (const eq of col.equivalences) {
+                if (seenIdx.has(eq.idx)) continue;
+                seenIdx.add(eq.idx);
+                parts.push(`<span class="compare-rel compare-rel-equiv">≡ <span class="compare-cell-link" onclick="showModal(${eq.idx})">${getDisplayLabel(CELL_TYPES[eq.idx])}</span></span>`);
+            }
+            for (const st of col.subtypeOf) {
+                if (seenIdx.has(st.idx)) continue;
+                seenIdx.add(st.idx);
+                parts.push(`<span class="compare-rel compare-rel-parent">↑ <span class="compare-cell-link" onclick="showModal(${st.idx})">${getDisplayLabel(CELL_TYPES[st.idx])}</span></span>`);
+            }
+            if (col.hasSubtypes.length > 0) {
+                const children = col.hasSubtypes.filter(h => !seenIdx.has(h.idx));
+                if (children.length > 0) {
+                    const childLinks = children.map(h => {
+                        seenIdx.add(h.idx);
+                        return `<span class="compare-cell-link" onclick="showModal(${h.idx})">${getDisplayLabel(CELL_TYPES[h.idx])}</span>`;
+                    }).join(', ');
+                    parts.push(`<span class="compare-rel compare-rel-children">↓ ${childLinks}</span>`);
+                }
+            }
+
+            html += `<td>${parts.length ? parts.join('') : '<span class="compare-empty">—</span>'}</td>`;
+        }
+        html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    wrapper.innerHTML = html;
+}
+
+function toggleCompareDetail(anchorIdx) {
+    if (compareSelectedRow === anchorIdx) {
+        compareSelectedRow = null;
+        document.getElementById('compareDetailWrapper').innerHTML = '';
+        // Un-highlight row
+        document.querySelectorAll('.compare-table tr').forEach(tr => tr.classList.remove('compare-row-selected'));
+        document.querySelectorAll('.compare-expand-btn').forEach(btn => btn.textContent = '▶');
+    } else {
+        compareSelectedRow = anchorIdx;
+        // Update row highlighting
+        document.querySelectorAll('.compare-table tr').forEach(tr => {
+            const idx = parseInt(tr.dataset.anchorIdx);
+            tr.classList.toggle('compare-row-selected', idx === anchorIdx);
+        });
+        document.querySelectorAll('.compare-expand-btn').forEach(btn => {
+            const tr = btn.closest('tr');
+            btn.textContent = parseInt(tr?.dataset?.anchorIdx) === anchorIdx ? '▼' : '▶';
+        });
+        renderCompareDetail(anchorIdx);
+    }
+}
+
+function renderCompareDetail(anchorIdx) {
+    const wrapper = document.getElementById('compareDetailWrapper');
+    const anchorCt = CELL_TYPES[anchorIdx];
+    const rels = getAssertedRelationships(anchorIdx);
+
+    // Collect all related cells (including anchor)
+    const allCells = [{ ct: anchorCt, idx: anchorIdx }];
+    const seenIdx = new Set([anchorIdx]);
+    for (const eq of rels.equivalences) {
+        if (!seenIdx.has(eq.idx)) { allCells.push({ ct: CELL_TYPES[eq.idx], idx: eq.idx }); seenIdx.add(eq.idx); }
+    }
+    for (const st of rels.subtypeOf) {
+        if (!seenIdx.has(st.idx)) { allCells.push({ ct: CELL_TYPES[st.idx], idx: st.idx }); seenIdx.add(st.idx); }
+    }
+    for (const hs of rels.hasSubtypes) {
+        if (!seenIdx.has(hs.idx)) { allCells.push({ ct: CELL_TYPES[hs.idx], idx: hs.idx }); seenIdx.add(hs.idx); }
+    }
+
+    // Phenotype rows
+    const phenotypeRows = [
+        { label: 'Species', key: 'species', getValue: ct => ct.species || '—' },
+        { label: 'Soma Location', key: 'soma', getValue: ct => (ct.somaLocations && ct.somaLocations.length) ? ct.somaLocations.join(', ') : (ct.somaLocation || '—') },
+        { label: 'Functional Phenotype', key: 'physiology', getValue: ct => ct.physiologyString || '—' },
+        { label: 'Axon Phenotype', key: 'axon', getValue: ct => ct.fiberTypeString || '—' },
+        { label: 'Threshold Phenotype', key: 'threshold', getValue: ct => {
+            if (!ct.clusterAttributes) return '—';
+            const flags = [];
+            if (ct.clusterAttributes.cold_sensitive) flags.push('cold sensitive');
+            if (ct.clusterAttributes.heat_sensitive) flags.push('heat sensitive');
+            if (ct.clusterAttributes.mechanosensitive_ltm) flags.push('LTM');
+            if (ct.clusterAttributes.mechanosensitive_htm) flags.push('HTM');
+            if (ct.clusterAttributes.proprioceptive) flags.push('proprioceptive');
+            return flags.length ? flags.join(', ') : '—';
+        }},
+        { label: 'Adaptation Phenotype', key: 'adaptation', getValue: ct => {
+            if (!ct.clusterAttributes) return '—';
+            const flags = [];
+            if (ct.clusterAttributes.rapidly_adapting) flags.push('rapidly adapting');
+            if (ct.clusterAttributes.slowly_adapting) flags.push('slowly adapting');
+            return flags.length ? flags.join(', ') : '—';
+        }},
+        { label: 'Marker Genes', key: 'genes', getValue: ct => {
+            if (!ct.markerGenes || !ct.markerGenes.length) return '—';
+            return ct.markerGenes.map(g => g.name).join(', ');
+        }}
+    ];
+
+    // Compute values and shared genes
+    const allGenes = new Map(); // gene -> count of cells that have it
+    for (const { ct } of allCells) {
+        if (ct.markerGenes) {
+            const seen = new Set();
+            for (const g of ct.markerGenes) {
+                const key = g.name.toLowerCase();
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    allGenes.set(key, (allGenes.get(key) || 0) + 1);
+                }
+            }
+        }
+    }
+    const sharedGenes = new Set([...allGenes.entries()].filter(([, count]) => count > 1).map(([name]) => name));
+
+    // Build table
+    let html = `<div class="compare-detail-header"><h3>Phenotype Comparison: ${getDisplayLabel(anchorCt)}</h3><button class="compare-detail-close" onclick="toggleCompareDetail(${anchorIdx})">✕</button></div>`;
+    html += '<table class="compare-detail-table"><thead><tr><th style="background:#4a5568;">Phenotype</th>';
+    for (const { ct } of allCells) {
+        const color = getSourceColor(ct.sourceNomenclatureLabel);
+        html += `<th style="background:${color};"><span class="compare-cell-link" onclick="showModal(${allCells.find(c => c.ct === ct).idx})" style="color:white;text-decoration:underline dotted rgba(255,255,255,0.5);">${getDisplayLabel(ct)}</span><br><span style="font-weight:400;font-size:0.7rem;opacity:0.8;">${ct.sourceNomenclatureLabel}</span></th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    for (const pRow of phenotypeRows) {
+        const values = allCells.map(({ ct }) => pRow.getValue(ct));
+        const allSame = values.every(v => v === values[0]);
+        html += '<tr>';
+        html += `<td>${pRow.label}</td>`;
+
+        for (let i = 0; i < allCells.length; i++) {
+            const val = values[i];
+            let cellClass = '';
+            if (allCells.length > 1) {
+                cellClass = allSame ? 'compare-match' : 'compare-diff';
+            }
+
+            if (pRow.key === 'genes' && val !== '—') {
+                // Highlight shared genes
+                const genes = allCells[i].ct.markerGenes.map(g => {
+                    const isShared = sharedGenes.has(g.name.toLowerCase());
+                    return `<span class="${isShared ? 'compare-gene-shared' : ''}">${g.name}</span>`;
+                }).join(', ');
+                html += `<td class="${cellClass}">${genes}</td>`;
+            } else {
+                html += `<td class="${cellClass}">${val}</td>`;
+            }
+        }
+        html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    wrapper.innerHTML = html;
+}
+
+function getCompareSelections() {
+    const anchor = document.getElementById('compareAnchorSelect').value;
+    const selects = document.querySelectorAll('#compareSelectors select');
+    const compareSources = [...selects].map(s => s.value).filter(Boolean);
+    return { anchor, compareSources };
+}
+
+function updateCompareTable() {
+    const { anchor, compareSources } = getCompareSelections();
+    if (!anchor) return;
+    compareSelectedRow = null;
+    document.getElementById('compareDetailWrapper').innerHTML = '';
+    const tableRows = buildCompareData(anchor, compareSources);
+    renderCompareTable(tableRows, compareSources);
+}
+
+function addCompareSource(preselect) {
+    const container = document.getElementById('compareSelectors');
+    const anchor = document.getElementById('compareAnchorSelect').value;
+    const existingSelects = container.querySelectorAll('select');
+    const usedSources = new Set([anchor, ...[...existingSelects].map(s => s.value).filter(Boolean)]);
+    const available = getUniqueSources().filter(s => !usedSources.has(s));
+    if (!available.length) return;
+
+    const wrapper = document.createElement('span');
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '0.2rem';
+
+    const select = document.createElement('select');
+    select.innerHTML = '<option value="">Select source...</option>' + available.map(s => `<option value="${s}"${preselect === s ? ' selected' : ''}>${s}</option>`).join('');
+    select.addEventListener('change', updateCompareTable);
+    select.style.cssText = 'padding:0.4rem 0.75rem;border-radius:6px;border:1px solid #cbd5e0;font-size:0.85rem;background:white;';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'compare-remove-btn';
+    removeBtn.textContent = '✕';
+    removeBtn.onclick = () => { wrapper.remove(); updateCompareTable(); };
+
+    wrapper.appendChild(select);
+    wrapper.appendChild(removeBtn);
+    container.appendChild(wrapper);
+
+    if (preselect) updateCompareTable();
+}
+
+function copyCompareLink() {
+    const { anchor, compareSources } = getCompareSelections();
+    const p = { view: 'compare' };
+    if (anchor) p.anchor = anchor;
+    if (compareSources.length) p.compare = compareSources.join('|');
+    copyPermalink(p);
+}
+
+function renderCompareView(anchorPreset, comparePreset) {
+    const anchorSelect = document.getElementById('compareAnchorSelect');
+    const sources = getUniqueSources();
+
+    if (!compareInitialized) {
+        // Populate anchor dropdown
+        anchorSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
+        if (anchorPreset && sources.includes(anchorPreset)) {
+            anchorSelect.value = anchorPreset;
+        }
+        anchorSelect.addEventListener('change', () => {
+            // Clear compare selectors and rebuild
+            document.getElementById('compareSelectors').innerHTML = '';
+            document.getElementById('compareDetailWrapper').innerHTML = '';
+            compareSelectedRow = null;
+            updateCompareTable();
+        });
+
+        // Add Source button
+        document.getElementById('compareAddSourceBtn').addEventListener('click', () => addCompareSource());
+
+        // Copy Link button
+        document.getElementById('compareCopyLinkBtn').addEventListener('click', copyCompareLink);
+
+        compareInitialized = true;
+    }
+
+    // If presets provided (from URL params), set them up
+    if (anchorPreset && sources.includes(anchorPreset)) {
+        anchorSelect.value = anchorPreset;
+    }
+
+    if (comparePreset && comparePreset.length) {
+        document.getElementById('compareSelectors').innerHTML = '';
+        for (const cs of comparePreset) {
+            if (sources.includes(cs) && cs !== anchorSelect.value) {
+                addCompareSource(cs);
+            }
+        }
+    }
+
+    updateCompareTable();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     renderCards();
     initGeneButtons();
@@ -2061,8 +2440,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const atlasAnnotation = params.get('atlasannotation');
 
         // Switch view if specified (default to cards)
-        if (view && ['cards','tree','synthesis','cluster','lineage'].includes(view)) {
-            switchView(view);
+        if (view && ['cards','tree','synthesis','cluster','lineage','compare'].includes(view)) {
+            if (view === 'compare') {
+                const anchor = params.get('anchor');
+                const compareParam = params.get('compare');
+                const compareSources = compareParam ? compareParam.split('|').map(s => s.trim()) : [];
+                switchView('compare');
+                renderCompareView(anchor, compareSources);
+            } else {
+                switchView(view);
+            }
+
+            // Restore view-specific state from URL params
+            if (view === 'tree') {
+                const grouping = params.get('grouping');
+                if (grouping && (grouping === 'location' || grouping === 'axon')) {
+                    setTreeGrouping(grouping);
+                }
+            }
+            if (view === 'synthesis') {
+                const groupBy = params.get('groupBy');
+                const sortBy = params.get('sortBy');
+                const highlightEquiv = params.get('highlightEquiv');
+                const highlightSubtype = params.get('highlightSubtype');
+                let needsRender = false;
+                if (groupBy) { document.getElementById('synthesisGroupBy').value = groupBy; needsRender = true; }
+                if (sortBy) { document.getElementById('synthesisSortBy').value = sortBy; needsRender = true; }
+                if (highlightEquiv === 'true') { document.getElementById('synthesisHighlightEquiv').checked = true; needsRender = true; }
+                if (highlightSubtype === 'true') { document.getElementById('synthesisHighlightSubtype').checked = true; needsRender = true; }
+                if (needsRender) renderSynthesisView();
+            }
+            if (view === 'cluster') {
+                const attrsParam = params.get('attrs');
+                if (attrsParam) {
+                    const attrs = attrsParam.split('|');
+                    // Wait briefly for cluster to initialize, then click matching attr buttons
+                    setTimeout(() => {
+                        attrs.forEach(attr => {
+                            const btn = document.querySelector(`.attr-btn[data-attr="${attr}"]`);
+                            if (btn) btn.click();
+                        });
+                    }, 100);
+                }
+            }
         }
 
         // Apply card-view filters by setting dropdown values

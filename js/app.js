@@ -2113,23 +2113,8 @@ function getSourceColor(sourceLabel) {
 
 function buildCompareData(anchorSource, compareSources) {
     const rows = [];
-    // All 18 CSA paper master cell entity bases (from Excel column A "N master").
-    // Species variants of master cells are excluded from Compare view.
-    const CSA_MASTER_BASES = [
-        'DRG Pvalb', 'DRG TG Ntrk3^high+S100a16', 'DRG TG Ntrk3^high+Ntrk2',
-        'DRG TG Ntrk3^low+Ntrk2', 'DRG TG Calca+Smr2', 'DRG TG Calca+Bmpr1b',
-        'DRG TG Th', 'DRG TG Mrgprd', 'DRG TG Mrgpra3+Trpv1',
-        'DRG TG Mrgpra3+Mrgprb4', 'DRG TG Calca+Sstr2', 'DRG TG Calca+Oprk1',
-        'DRG TG Calca+Adra2a', 'DRG Calca+Dcn', 'DRG Rxfp1',
-        'DRG TG Trpm8', 'DRG TG Sst', 'DRG TG Atf3'
-    ];
     CELL_TYPES.forEach((ct, idx) => {
         if (ct.sourceNomenclatureLabel !== anchorSource) return;
-        // Skip species variants of CSA master cells
-        if (anchorSource === 'CSA paper') {
-            const e = ct.entity.toLowerCase();
-            if (CSA_MASTER_BASES.some(base => e.startsWith(base.toLowerCase() + ' '))) return;
-        }
         const rels = getAssertedRelationships(idx);
         const columns = {};
         for (const cs of compareSources) {

@@ -2237,17 +2237,21 @@ function buildCompareDetailHTML(anchorIdx) {
     const allowedSources = new Set([anchor, ...compareSources]);
 
     // Collect related cells, filtered to only selected sources
-    const allCells = [{ ct: anchorCt, idx: anchorIdx }];
+    const relatedCells = [];
     const seenIdx = new Set([anchorIdx]);
     for (const eq of rels.equivalences) {
-        if (!seenIdx.has(eq.idx) && allowedSources.has(CELL_TYPES[eq.idx].sourceNomenclatureLabel)) { allCells.push({ ct: CELL_TYPES[eq.idx], idx: eq.idx }); seenIdx.add(eq.idx); }
+        if (!seenIdx.has(eq.idx) && allowedSources.has(CELL_TYPES[eq.idx].sourceNomenclatureLabel)) { relatedCells.push({ ct: CELL_TYPES[eq.idx], idx: eq.idx }); seenIdx.add(eq.idx); }
     }
     for (const st of rels.subtypeOf) {
-        if (!seenIdx.has(st.idx) && allowedSources.has(CELL_TYPES[st.idx].sourceNomenclatureLabel)) { allCells.push({ ct: CELL_TYPES[st.idx], idx: st.idx }); seenIdx.add(st.idx); }
+        if (!seenIdx.has(st.idx) && allowedSources.has(CELL_TYPES[st.idx].sourceNomenclatureLabel)) { relatedCells.push({ ct: CELL_TYPES[st.idx], idx: st.idx }); seenIdx.add(st.idx); }
     }
     for (const hs of rels.hasSubtypes) {
-        if (!seenIdx.has(hs.idx) && allowedSources.has(CELL_TYPES[hs.idx].sourceNomenclatureLabel)) { allCells.push({ ct: CELL_TYPES[hs.idx], idx: hs.idx }); seenIdx.add(hs.idx); }
+        if (!seenIdx.has(hs.idx) && allowedSources.has(CELL_TYPES[hs.idx].sourceNomenclatureLabel)) { relatedCells.push({ ct: CELL_TYPES[hs.idx], idx: hs.idx }); seenIdx.add(hs.idx); }
     }
+    // Sort related cells to match the main table's column order (compareSources order)
+    const sourceOrder = [anchor, ...compareSources];
+    relatedCells.sort((a, b) => sourceOrder.indexOf(a.ct.sourceNomenclatureLabel) - sourceOrder.indexOf(b.ct.sourceNomenclatureLabel));
+    const allCells = [{ ct: anchorCt, idx: anchorIdx }, ...relatedCells];
 
     // Phenotype rows
     const phenotypeRows = [

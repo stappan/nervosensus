@@ -2096,7 +2096,7 @@ function copyLineageLink() {
 
 // ===== Compare View =====
 let compareInitialized = false;
-let compareSelectedRow = null;
+let compareExpandedRows = new Set();
 
 function getDisplayLabel(ct) {
     return ct.localLabel || ct.preferredLabel;
@@ -2113,8 +2113,23 @@ function getSourceColor(sourceLabel) {
 
 function buildCompareData(anchorSource, compareSources) {
     const rows = [];
+    // All 18 CSA paper master cell entity bases (from Excel column A "N master").
+    // Species variants of master cells are excluded from Compare view.
+    const CSA_MASTER_BASES = [
+        'DRG Pvalb', 'DRG TG Ntrk3^high+S100a16', 'DRG TG Ntrk3^high+Ntrk2',
+        'DRG TG Ntrk3^low+Ntrk2', 'DRG TG Calca+Smr2', 'DRG TG Calca+Bmpr1b',
+        'DRG TG Th', 'DRG TG Mrgprd', 'DRG TG Mrgpra3+Trpv1',
+        'DRG TG Mrgpra3+Mrgprb4', 'DRG TG Calca+Sstr2', 'DRG TG Calca+Oprk1',
+        'DRG TG Calca+Adra2a', 'DRG Calca+Dcn', 'DRG Rxfp1',
+        'DRG TG Trpm8', 'DRG TG Sst', 'DRG TG Atf3'
+    ];
     CELL_TYPES.forEach((ct, idx) => {
         if (ct.sourceNomenclatureLabel !== anchorSource) return;
+        // Skip species variants of CSA master cells
+        if (anchorSource === 'CSA paper') {
+            const e = ct.entity.toLowerCase();
+            if (CSA_MASTER_BASES.some(base => e.startsWith(base.toLowerCase() + ' '))) return;
+        }
         const rels = getAssertedRelationships(idx);
         const columns = {};
         for (const cs of compareSources) {
@@ -2142,6 +2157,7 @@ function renderCompareTable(tableRows, compareSources) {
 
     const anchorSource = tableRows[0].anchorCell.sourceNomenclatureLabel;
     const anchorColor = getSourceColor(anchorSource);
+    const totalCols = 2 + compareSources.length; // expand btn + anchor + compare sources
 
     let html = '<table class="compare-table"><thead><tr>';
     html += '<th style="background:#718096;width:2rem;"></th>';
@@ -2152,9 +2168,9 @@ function renderCompareTable(tableRows, compareSources) {
     html += '</tr></thead><tbody>';
 
     for (const row of tableRows) {
-        const isSelected = compareSelectedRow === row.anchorIdx;
-        html += `<tr class="${isSelected ? 'compare-row-selected' : ''}" data-anchor-idx="${row.anchorIdx}">`;
-        html += `<td class="compare-expand-btn" onclick="toggleCompareDetail(${row.anchorIdx})">${isSelected ? '▼' : '▶'}</td>`;
+        const isExpanded = compareExpandedRows.has(row.anchorIdx);
+        html += `<tr class="${isExpanded ? 'compare-row-selected' : ''}" data-anchor-idx="${row.anchorIdx}">`;
+        html += `<td class="compare-expand-btn" onclick="toggleCompareDetail(${row.anchorIdx})">${isExpanded ? '▼' : '▶'}</td>`;
         html += `<td><span class="compare-cell-link" onclick="showModal(${row.anchorIdx})">${getDisplayLabel(row.anchorCell)}</span></td>`;
 
         for (const cs of compareSources) {
@@ -2188,6 +2204,11 @@ function renderCompareTable(tableRows, compareSources) {
             html += `<td>${parts.length ? parts.join('') : '<span class="compare-empty">—</span>'}</td>`;
         }
         html += '</tr>';
+
+        // Inline detail row (hidden or visible based on expanded state)
+        if (isExpanded) {
+            html += `<tr class="compare-detail-row" data-detail-for="${row.anchorIdx}"><td colspan="${totalCols}">${buildCompareDetailHTML(row.anchorIdx)}</td></tr>`;
+        }
     }
 
     html += '</tbody></table>';
@@ -2195,43 +2216,52 @@ function renderCompareTable(tableRows, compareSources) {
 }
 
 function toggleCompareDetail(anchorIdx) {
-    if (compareSelectedRow === anchorIdx) {
-        compareSelectedRow = null;
-        document.getElementById('compareDetailWrapper').innerHTML = '';
-        // Un-highlight row
-        document.querySelectorAll('.compare-table tr').forEach(tr => tr.classList.remove('compare-row-selected'));
-        document.querySelectorAll('.compare-expand-btn').forEach(btn => btn.textContent = '▶');
+    const parentRow = document.querySelector(`.compare-table tr[data-anchor-idx="${anchorIdx}"]`);
+    if (!parentRow) return;
+    const expandBtn = parentRow.querySelector('.compare-expand-btn');
+
+    if (compareExpandedRows.has(anchorIdx)) {
+        // Collapse: remove detail row, update state
+        compareExpandedRows.delete(anchorIdx);
+        parentRow.classList.remove('compare-row-selected');
+        if (expandBtn) expandBtn.textContent = '▶';
+        const detailRow = document.querySelector(`.compare-detail-row[data-detail-for="${anchorIdx}"]`);
+        if (detailRow) detailRow.remove();
     } else {
-        compareSelectedRow = anchorIdx;
-        // Update row highlighting
-        document.querySelectorAll('.compare-table tr').forEach(tr => {
-            const idx = parseInt(tr.dataset.anchorIdx);
-            tr.classList.toggle('compare-row-selected', idx === anchorIdx);
-        });
-        document.querySelectorAll('.compare-expand-btn').forEach(btn => {
-            const tr = btn.closest('tr');
-            btn.textContent = parseInt(tr?.dataset?.anchorIdx) === anchorIdx ? '▼' : '▶';
-        });
-        renderCompareDetail(anchorIdx);
+        // Expand: insert detail row after parent, update state
+        compareExpandedRows.add(anchorIdx);
+        parentRow.classList.add('compare-row-selected');
+        if (expandBtn) expandBtn.textContent = '▼';
+        const { anchor, compareSources } = getCompareSelections();
+        const totalCols = 2 + compareSources.length;
+        const detailRow = document.createElement('tr');
+        detailRow.className = 'compare-detail-row';
+        detailRow.dataset.detailFor = anchorIdx;
+        const td = document.createElement('td');
+        td.colSpan = totalCols;
+        td.innerHTML = buildCompareDetailHTML(anchorIdx);
+        detailRow.appendChild(td);
+        parentRow.after(detailRow);
     }
 }
 
-function renderCompareDetail(anchorIdx) {
-    const wrapper = document.getElementById('compareDetailWrapper');
+function buildCompareDetailHTML(anchorIdx) {
     const anchorCt = CELL_TYPES[anchorIdx];
     const rels = getAssertedRelationships(anchorIdx);
+    const { anchor, compareSources } = getCompareSelections();
+    const allowedSources = new Set([anchor, ...compareSources]);
 
-    // Collect all related cells (including anchor)
+    // Collect related cells, filtered to only selected sources
     const allCells = [{ ct: anchorCt, idx: anchorIdx }];
     const seenIdx = new Set([anchorIdx]);
     for (const eq of rels.equivalences) {
-        if (!seenIdx.has(eq.idx)) { allCells.push({ ct: CELL_TYPES[eq.idx], idx: eq.idx }); seenIdx.add(eq.idx); }
+        if (!seenIdx.has(eq.idx) && allowedSources.has(CELL_TYPES[eq.idx].sourceNomenclatureLabel)) { allCells.push({ ct: CELL_TYPES[eq.idx], idx: eq.idx }); seenIdx.add(eq.idx); }
     }
     for (const st of rels.subtypeOf) {
-        if (!seenIdx.has(st.idx)) { allCells.push({ ct: CELL_TYPES[st.idx], idx: st.idx }); seenIdx.add(st.idx); }
+        if (!seenIdx.has(st.idx) && allowedSources.has(CELL_TYPES[st.idx].sourceNomenclatureLabel)) { allCells.push({ ct: CELL_TYPES[st.idx], idx: st.idx }); seenIdx.add(st.idx); }
     }
     for (const hs of rels.hasSubtypes) {
-        if (!seenIdx.has(hs.idx)) { allCells.push({ ct: CELL_TYPES[hs.idx], idx: hs.idx }); seenIdx.add(hs.idx); }
+        if (!seenIdx.has(hs.idx) && allowedSources.has(CELL_TYPES[hs.idx].sourceNomenclatureLabel)) { allCells.push({ ct: CELL_TYPES[hs.idx], idx: hs.idx }); seenIdx.add(hs.idx); }
     }
 
     // Phenotype rows
@@ -2264,7 +2294,7 @@ function renderCompareDetail(anchorIdx) {
     ];
 
     // Compute values and shared genes
-    const allGenes = new Map(); // gene -> count of cells that have it
+    const allGenes = new Map();
     for (const { ct } of allCells) {
         if (ct.markerGenes) {
             const seen = new Set();
@@ -2279,12 +2309,13 @@ function renderCompareDetail(anchorIdx) {
     }
     const sharedGenes = new Set([...allGenes.entries()].filter(([, count]) => count > 1).map(([name]) => name));
 
-    // Build table
-    let html = `<div class="compare-detail-header"><h3>Phenotype Comparison: ${getDisplayLabel(anchorCt)}</h3><button class="compare-detail-close" onclick="toggleCompareDetail(${anchorIdx})">✕</button></div>`;
+    // Build detail sub-table
+    let html = '<div class="compare-detail-inline">';
+    html += `<div class="compare-detail-header"><h3>Phenotype Comparison: ${getDisplayLabel(anchorCt)}</h3></div>`;
     html += '<table class="compare-detail-table"><thead><tr><th style="background:#4a5568;">Phenotype</th>';
-    for (const { ct } of allCells) {
+    for (const { ct, idx } of allCells) {
         const color = getSourceColor(ct.sourceNomenclatureLabel);
-        html += `<th style="background:${color};"><span class="compare-cell-link" onclick="showModal(${allCells.find(c => c.ct === ct).idx})" style="color:white;text-decoration:underline dotted rgba(255,255,255,0.5);">${getDisplayLabel(ct)}</span><br><span style="font-weight:400;font-size:0.7rem;opacity:0.8;">${ct.sourceNomenclatureLabel}</span></th>`;
+        html += `<th style="background:${color};"><span class="compare-cell-link" onclick="showModal(${idx})" style="color:white;text-decoration:underline dotted rgba(255,255,255,0.5);">${getDisplayLabel(ct)}</span><br><span style="font-weight:400;font-size:0.7rem;opacity:0.8;">${ct.sourceNomenclatureLabel}</span></th>`;
     }
     html += '</tr></thead><tbody>';
 
@@ -2302,7 +2333,6 @@ function renderCompareDetail(anchorIdx) {
             }
 
             if (pRow.key === 'genes' && val !== '—') {
-                // Highlight shared genes
                 const genes = allCells[i].ct.markerGenes.map(g => {
                     const isShared = sharedGenes.has(g.name.toLowerCase());
                     return `<span class="${isShared ? 'compare-gene-shared' : ''}">${g.name}</span>`;
@@ -2315,8 +2345,8 @@ function renderCompareDetail(anchorIdx) {
         html += '</tr>';
     }
 
-    html += '</tbody></table>';
-    wrapper.innerHTML = html;
+    html += '</tbody></table></div>';
+    return html;
 }
 
 function getCompareSelections() {
@@ -2329,8 +2359,7 @@ function getCompareSelections() {
 function updateCompareTable() {
     const { anchor, compareSources } = getCompareSelections();
     if (!anchor) return;
-    compareSelectedRow = null;
-    document.getElementById('compareDetailWrapper').innerHTML = '';
+    compareExpandedRows.clear();
     const tableRows = buildCompareData(anchor, compareSources);
     renderCompareTable(tableRows, compareSources);
 }
@@ -2386,8 +2415,7 @@ function renderCompareView(anchorPreset, comparePreset) {
         anchorSelect.addEventListener('change', () => {
             // Clear compare selectors and rebuild
             document.getElementById('compareSelectors').innerHTML = '';
-            document.getElementById('compareDetailWrapper').innerHTML = '';
-            compareSelectedRow = null;
+            compareExpandedRows.clear();
             updateCompareTable();
         });
 

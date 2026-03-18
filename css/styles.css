@@ -27,7 +27,7 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .gene-display { padding: 1rem; background: linear-gradient(135deg, #667eea15, #764ba215); border: 2px solid #667eea40; border-radius: 10px; font-size: 0.95rem; font-weight: 700; color: #2d3748; line-height: 1.6; }
 
 /* Filter Bar */
-.filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.5rem; padding: 1rem; background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); align-items: center; }
+.filter-bar { display: flex; flex-wrap: wrap; margin-bottom: 1.5rem; align-items: center; }
 .filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
 .filter-label { font-size: 0.7rem; color: #718096; font-weight: 600; text-transform: uppercase; }
 .filter-select { padding: 0.4rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; min-width: 120px; background: white; cursor: pointer; }
@@ -82,7 +82,8 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .maps-to-title { font-weight: 600; color: #92400e; font-size: 0.9rem; margin-bottom: 0.5rem; }
 .maps-to-link { color: #b45309; text-decoration: none; font-weight: 600; }
 .maps-to-link:hover { text-decoration: underline; }
-.tree-container { padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+/* Tree View */
 .tree-soma-group { margin-bottom: 1.5rem; }
 .tree-soma-header { padding: 1rem 1.25rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 0.75rem; }
 .tree-soma-icon { font-size: 1.25rem; }
@@ -134,8 +135,7 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .synthesis-table th.sortable:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1); }
 .sort-indicator { margin-left: 0.3rem; font-size: 0.7rem; }
 
-.synthesis-container { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
-.synthesis-header { padding: 1.5rem; background: linear-gradient(135deg, #667eea15, #764ba215); border-bottom: 1px solid #e2e8f0; }
+.synthesis-header { padding: 1.5rem; background: white; border-bottom: 1px solid #e2e8f0; }
 .synthesis-header h2 { color: #2d3748; margin-bottom: 0.5rem; }
 .synthesis-header p { color: #718096; font-size: 0.9rem; }
 .synthesis-table-wrapper { overflow-x: auto; max-height: 600px; overflow-y: auto; }
@@ -154,7 +154,6 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 
 
 /* Dendrogram View */
-.dendrogram-container { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
 .dendrogram-header { padding: 1.5rem; background: linear-gradient(135deg, #667eea15, #764ba215); border-bottom: 1px solid #e2e8f0; }
 .dendrogram-header h2 { color: #2d3748; margin-bottom: 0.5rem; }
 .dendrogram-header p { color: #718096; font-size: 0.9rem; }
@@ -220,7 +219,6 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 }
 
 /* Lineage View */
-.lineage-container { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
 .lineage-header { padding: 1.5rem; background: linear-gradient(135deg, #667eea15, #764ba215); border-bottom: 1px solid #e2e8f0; }
 .lineage-header h2 { color: #2d3748; margin-bottom: 0.5rem; }
 .lineage-content { padding: 1.5rem; overflow-x: auto; min-height: 500px; }
@@ -237,11 +235,12 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .lineage-link.equiv { stroke: #f59e0b; stroke-width: 2px; stroke-dasharray: 5,3; }
 .lineage-link.asserted-subclass { stroke: #8b5cf6; stroke-width: 2px; }
 .lineage-equiv-label { font-size: 9px; fill: #f59e0b; font-weight: 600; }
-.lineage-legend { display: flex; gap: 2rem; padding: 1rem 1.5rem; background: #f8fafc; border-top: 1px solid #e2e8f0; flex-wrap: wrap; }
+.lineage-legend { display: flex; gap: 2rem; padding: 1rem 1.5rem; border-top: 1px solid #e2e8f0; flex-wrap: wrap; }
 .lineage-legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #4a5568; }
 .lineage-legend-line { width: 30px; height: 3px; border-radius: 2px; }
 
-.cluster-container { display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+/* Cluster View */
+.cluster-container { display: flex; flex-direction: column; }
 .cluster-top-bar { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea15, #764ba215); border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 1rem; }
 .cluster-stats-inline { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .stat-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
@@ -378,3 +377,37 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 /* No results message */
 .compare-no-results { text-align: center; padding: 3rem; color: #718096; font-size: 0.95rem; }
 
+/*intro text styling*/
+.provisional-banner {
+    background: #fef9ec;
+    border-left: 4px solid #f59e0b;
+    color: #78350f;
+    font-size: 1.0rem;
+    font-style: bold;
+    padding: 0.5rem 1rem;
+    margin: 0 0 0.75rem 0;
+}
+
+.view-note {
+    font-size: 1.0rem;
+    font-style: bold
+    color: #718096;
+    margin: 0.5rem 1rem 0.75rem 1rem;
+    padding: 0.4rem 0.75rem;
+}
+
+.view-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0.75rem 1rem 0.1rem 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+.view-container {
+	padding: 2rem; 
+	background: white; 
+	border-radius: 12px; 
+	box-shadow: 0 2px 8px rgba(0,0,0,0.1);     
+	overflow: hidden;
+}

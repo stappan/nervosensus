@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,36 +10,50 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
+
 <body>
     <div class="container">
         <div class="header-row">
-            <div><h1>🧬 NervoSensus</h1><p class="subtitle">Interactive Sensory Neuron Cell Type Explorer</p></div>
+            <div>
+                <h1>🧬 NervoSensus</h1>
+                <p class="subtitle">Interactive Sensory Neuron Cell Type Explorer</p>
+            </div>
             <div class="upload-section">
                 <button class="upload-btn" onclick="showUploadModal()">📁 Load Data</button>
                 <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(event)">
                 <span class="data-status" id="dataStatus">Default data (145 cells)</span>
             </div>
         </div>
+        <div class="provisional-banner">
+            NervoSensus presents provisional relationships drawn from published literature for hypothesis-generation. It
+            is designed for neuroscience researchers working with somatosensory neuron cell types — particularly those
+            navigating the multiple, sometimes conflicting, nomenclatures used across different published atlases and
+            studies. Nothing shown here represents settled scientific claim.</div>
         <div class="view-buttons">
             <button class="view-btn active" data-view="cards">📋 Card View</button>
             <button class="view-btn" data-view="tree">🌳 Tree View</button>
             <button class="view-btn" data-view="synthesis">📊 Synthesis View</button>
             <button class="view-btn" data-view="cluster">🔮 Cluster View</button>
-            <button class="view-btn" data-view="lineage">🌳 Lineage</button>
+            <button class="view-btn" data-view="lineage">🌳 Provisional Mapping</button>
             <button class="view-btn" data-view="compare">🔀 Compare</button>
         </div>
-        <div id="cardViewContainer">
+        <div id="cardViewContainer" class="view-container">
+            <h2 class="view-header">Card View</h2>
+            <p class="view-note">Cell cards reflect data as reported in each source publication. Fields such as circuit
+                role and marker gene expression represent the authors' characterizations and may not be exhaustive.</p>
             <div class="filter-bar" id="filterBar">
                 <div class="filter-group">
                     <span class="filter-label">Source</span>
-                    <select class="filter-select" id="filterSource" onchange="applyCardFilters()"><option value="">All Sources</option>
+                    <select class="filter-select" id="filterSource" onchange="applyCardFilters()">
+                        <option value="">All Sources</option>
                         <option value="CSA paper">CSA paper</option>
                         <option value="big DRG paper">big DRG paper</option>
                         <option value="Tavares-Ferreira et al., 2022">Tavares-Ferreira et al., 2022</option>
                         <option value="Yu et al., 2024">Yu et al., 2024</option>
                         <option value="Krauter et al., 2025">Krauter et al., 2025</option>
                         <option value="Qi et al., 2024">Qi et al., 2024</option>
-                        <option value="Kupari et al., 2021">Kupari et al., 2021</option></select>
+                        <option value="Kupari et al., 2021">Kupari et al., 2021</option>
+                    </select>
                 </div>
                 <div class="filter-group">
                     <span class="filter-label">Species</span>
@@ -69,7 +84,8 @@
                 </div>
                 <div class="filter-group">
                     <span class="filter-label">Gene</span>
-                    <select class="filter-select" id="filterGene" onchange="applyCardFilters()" style="min-width:150px;">
+                    <select class="filter-select" id="filterGene" onchange="applyCardFilters()"
+                        style="min-width:150px;">
                         <option value="">All Genes</option>
                     </select>
                 </div>
@@ -77,8 +93,8 @@
                     <span class="filter-label">Equivalence</span>
                     <select class="filter-select" id="filterEquiv" onchange="applyCardFilters()">
                         <option value="">Any</option>
-                        <option value="yes">Has Equivalence</option>
-                        <option value="no">No Equivalence</option>
+                        <option value="yes">Has proposed equivalence</option>
+                        <option value="no">No proposed equivalence</option>
                     </select>
                 </div>
                 <button class="filter-clear" onclick="clearCardFilters()">Clear Filters</button>
@@ -87,23 +103,30 @@
             </div>
             <div class="cards-compact-grid" id="cardsContainer"></div>
         </div>
-        <div id="treeViewContainer" style="display:none;">
+        <div id="treeViewContainer" class="view-container" style="display:none;">
             <div class="tree-container">
+                <h2 class="view-header">Tree View</h2>
+                <p class="view-note">Hierarchical groupings reflect current organizational logic based on soma location
+                    and axon type. These groupings are a navigational convenience, not a proposed taxonomic
+                    classification.</p>
                 <div class="tree-controls">
                     <span>Group by:</span>
-                    <button class="tree-toggle-btn active" data-group="location" onclick="setTreeGrouping('location')">Soma Location</button>
-                    <button class="tree-toggle-btn" data-group="axon" onclick="setTreeGrouping('axon')">Axon Phenotype</button>
-                    <button class="permalink-btn" onclick="copyTreeLink()" style="margin-left:auto;">🔗 Copy Link</button>
+                    <button class="tree-toggle-btn active" data-group="location"
+                        onclick="setTreeGrouping('location')">Soma Location</button>
+                    <button class="tree-toggle-btn" data-group="axon" onclick="setTreeGrouping('axon')">Axon
+                        Phenotype</button>
+                    <button class="permalink-btn" onclick="copyTreeLink()" style="margin-left:auto;">🔗 Copy
+                        Link</button>
                 </div>
                 <div id="treeView"></div>
             </div>
         </div>
-        <div id="synthesisViewContainer" style="display:none;">
+        <div id="synthesisViewContainer" class="view-container" style="display:none;">
             <div class="synthesis-container">
-                <div class="synthesis-header">
-                    <h2>📊 Cell Type Synthesis</h2>
-                    <p>Common features across all cell types. Click a cell name to view details. Cells with asserted equivalence are highlighted.</p>
-                </div>
+                <h2 class="view-header"> Cell Type Synthesis</h2>
+                <p class="view-note">Checkmarks indicate properties reported in source publications for each cell type.
+                    Absence of a checkmark reflects missing or unreported data — not a confirmed absence of that
+                    property.</p>
                 <div class="synthesis-controls">
                     <label>Group by:</label>
                     <select id="synthesisGroupBy" onchange="renderSynthesisView()">
@@ -118,11 +141,20 @@
                         <option value="species" selected>Species</option>
                         <option value="source">Source</option>
                     </select>
-                    <label style="margin-left:1rem;"><input type="checkbox" id="synthesisHighlightEquiv" onchange="renderSynthesisView()"><span style="display:inline-block;width:8px;height:8px;background:#f59e0b;border-radius:50%;margin:0 4px;vertical-align:middle;"></span>Equivalences</label>
-                    <label style="margin-left:0.5rem;"><input type="checkbox" id="synthesisHighlightSubtype" onchange="renderSynthesisView()"><span style="display:inline-block;width:8px;height:8px;background:#8b5cf6;border-radius:50%;margin:0 4px;vertical-align:middle;"></span>Subtypes</label>
-                    <button class="permalink-btn" onclick="copySynthesisLink()" style="margin-left:auto;">🔗 Copy Link</button>
-                    <span id="synthesisPinHint" style="margin-left:1rem;font-size:0.75rem;color:#718096;display:none;">💡 Click a cell name with dots to group related cells • 👁 to view details</span>
-                    <div id="synthesisPinStatus" style="display:none;margin-left:1rem;padding:0.4rem 0.8rem;background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #f59e0b;border-radius:6px;font-size:0.8rem;font-weight:600;color:#92400e;"></div>
+                    <label style="margin-left:1rem;"><input type="checkbox" id="synthesisHighlightEquiv"
+                            onchange="renderSynthesisView()"><span
+                            style="display:inline-block;width:8px;height:8px;background:#f59e0b;border-radius:50%;margin:0 4px;vertical-align:middle;"></span>Proposed equivalences</label>
+                    <label style="margin-left:0.5rem;"><input type="checkbox" id="synthesisHighlightSubtype"
+                            onchange="renderSynthesisView()"><span
+                            style="display:inline-block;width:8px;height:8px;background:#8b5cf6;border-radius:50%;margin:0 4px;vertical-align:middle;"></span>Proposed subtypes</label>
+                    <button class="permalink-btn" onclick="copySynthesisLink()" style="margin-left:auto;">🔗 Copy
+                        Link</button>
+                    <span id="synthesisPinHint"
+                        style="margin-left:1rem;font-size:0.75rem;color:#718096;display:none;">💡 Click a cell name with
+                        dots to group related cells • 👁 to view details</span>
+                    <div id="synthesisPinStatus"
+                        style="display:none;margin-left:1rem;padding:0.4rem 0.8rem;background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #f59e0b;border-radius:6px;font-size:0.8rem;font-weight:600;color:#92400e;">
+                    </div>
                 </div>
                 <div class="synthesis-table-wrapper">
                     <table class="synthesis-table" id="synthesisTable"></table>
@@ -133,76 +165,203 @@
                 </div>
             </div>
         </div>
-        <div id="clusterViewContainer" style="display:none;">
+        <div id="clusterViewContainer" class="view-container" style="display:none;">
             <div class="cluster-container">
+                <h2 class="view-header">Cluster</h2>
+                <p class="view-note">Cell proximity and groupings are driven by selected attributes, not by asserted
+                    biological similarity. Visual clustering is a tool for exploration and hypothesis generation only.
+                </p>
                 <div class="cluster-top-bar">
-                    <div class="cluster-stats-inline" id="clusterStatsInline"><div class="stat-item"><span class="stat-label">Total:</span><span class="stat-value" id="statTotal">54</span></div></div>
-                    <div class="cluster-legend-inline" id="clusterLegendInline"><div class="legend-item-inline"><div class="legend-dot" style="background:#667eea;"></div><span>Select attributes</span></div></div>
-                    <button class="permalink-btn" onclick="copyClusterLink()" style="margin-left:auto;">🔗 Copy Link</button>
+                    <div class="cluster-stats-inline" id="clusterStatsInline">
+                        <div class="stat-item"><span class="stat-label">Total:</span><span class="stat-value"
+                                id="statTotal">54</span></div>
+                    </div>
+                    <div class="cluster-legend-inline" id="clusterLegendInline">
+                        <div class="legend-item-inline">
+                            <div class="legend-dot" style="background:#667eea;"></div><span>Select attributes</span>
+                        </div>
+                    </div>
+                    <button class="permalink-btn" onclick="copyClusterLink()" style="margin-left:auto;">🔗 Copy
+                        Link</button>
                 </div>
                 <div class="cluster-main">
                     <div class="cluster-controls" id="clusterControls">
                         <h3>Select Attributes</h3>
                         <div class="selected-attrs-display" id="selectedAttrsDisplay">No attributes selected</div>
                         <button class="clear-filters-btn" onclick="clearAllFilters()">✕ Clear All Filters</button>
-                        <div class="attr-group"><div class="attr-group-title" onclick="toggleAttrGroup('phenotype')"><span id="toggle-phenotype">▼</span> Threshold Phenotype</div><div class="attr-group-content expanded" id="attr-group-phenotype"><button class="attr-btn" data-attr="cold_sensitive">Cold</button><button class="attr-btn" data-attr="heat_sensitive">Heat</button><button class="attr-btn" data-attr="mechanosensitive_ltm">LTM</button><button class="attr-btn" data-attr="mechanosensitive_htm">HTM</button><button class="attr-btn" data-attr="proprioceptive">Proprioceptive</button></div></div>
-                        <div class="attr-group"><div class="attr-group-title" onclick="toggleAttrGroup('adaptation')"><span id="toggle-adaptation">▼</span> Adaptation Phenotype</div><div class="attr-group-content expanded" id="attr-group-adaptation"><button class="attr-btn" data-attr="rapidly_adapting">RA</button><button class="attr-btn" data-attr="slowly_adapting">SA</button></div></div>
-                        <div class="attr-group"><div class="attr-group-title" onclick="toggleAttrGroup('axon')"><span id="toggle-axon">▼</span> Axon Phenotype</div><div class="attr-group-content expanded" id="attr-group-axon"><button class="attr-btn" data-attr="fiber_a_beta">Aβ</button><button class="attr-btn" data-attr="fiber_a_delta">Aδ</button><button class="attr-btn" data-attr="fiber_c">C</button></div></div>
-                        <div class="attr-group"><div class="attr-group-title" onclick="toggleAttrGroup('species')"><span id="toggle-species">▼</span> Species</div><div class="attr-group-content expanded" id="attr-group-species"><button class="attr-btn" data-attr="species_mouse">Mouse</button><button class="attr-btn" data-attr="species_human">Human</button><button class="attr-btn" data-attr="species_macaque">Macaque</button><button class="attr-btn" data-attr="species_guinea_pig">Guinea Pig</button></div></div>
-                        <div class="attr-group"><div class="attr-group-title" onclick="toggleAttrGroup('soma')"><span id="toggle-soma">▼</span> Soma Location</div><div class="attr-group-content expanded" id="attr-group-soma"><button class="attr-btn" data-attr="soma_drg">DRG</button><button class="attr-btn" data-attr="soma_tg">Trigeminal</button></div></div>
-                        <div class="attr-group"><div class="attr-group-title" onclick="toggleAttrGroup('source')"><span id="toggle-source">▼</span> Source</div><div class="attr-group-content expanded" id="attr-group-source"><button class="attr-btn" data-attr="source_0">CSA paper</button><button class="attr-btn" data-attr="source_1">big DRG paper</button><button class="attr-btn" data-attr="source_2">Tavares-Ferreira et al., 2022</button><button class="attr-btn" data-attr="source_3">Yu et al., 2024</button><button class="attr-btn" data-attr="source_4">Krauter et al., 2025</button><button class="attr-btn" data-attr="source_5">Qi et al., 2024</button><button class="attr-btn" data-attr="source_6">Kupari et al., 2021</button></div></div>
-                        <div class="attr-group"><div class="attr-group-title" onclick="toggleAttrGroup('genes')"><span id="toggle-genes">▶</span> Marker Genes</div><div class="attr-group-content collapsed" id="attr-group-genes"></div></div>
+                        <div class="attr-group">
+                            <div class="attr-group-title" onclick="toggleAttrGroup('phenotype')"><span
+                                    id="toggle-phenotype">▼</span> Threshold Phenotype</div>
+                            <div class="attr-group-content expanded" id="attr-group-phenotype"><button class="attr-btn"
+                                    data-attr="cold_sensitive">Cold</button><button class="attr-btn"
+                                    data-attr="heat_sensitive">Heat</button><button class="attr-btn"
+                                    data-attr="mechanosensitive_ltm">LTM</button><button class="attr-btn"
+                                    data-attr="mechanosensitive_htm">HTM</button><button class="attr-btn"
+                                    data-attr="proprioceptive">Proprioceptive</button></div>
+                        </div>
+                        <div class="attr-group">
+                            <div class="attr-group-title" onclick="toggleAttrGroup('adaptation')"><span
+                                    id="toggle-adaptation">▼</span> Adaptation Phenotype</div>
+                            <div class="attr-group-content expanded" id="attr-group-adaptation"><button class="attr-btn"
+                                    data-attr="rapidly_adapting">RA</button><button class="attr-btn"
+                                    data-attr="slowly_adapting">SA</button></div>
+                        </div>
+                        <div class="attr-group">
+                            <div class="attr-group-title" onclick="toggleAttrGroup('axon')"><span
+                                    id="toggle-axon">▼</span> Axon Phenotype</div>
+                            <div class="attr-group-content expanded" id="attr-group-axon"><button class="attr-btn"
+                                    data-attr="fiber_a_beta">Aβ</button><button class="attr-btn"
+                                    data-attr="fiber_a_delta">Aδ</button><button class="attr-btn"
+                                    data-attr="fiber_c">C</button></div>
+                        </div>
+                        <div class="attr-group">
+                            <div class="attr-group-title" onclick="toggleAttrGroup('species')"><span
+                                    id="toggle-species">▼</span> Species</div>
+                            <div class="attr-group-content expanded" id="attr-group-species"><button class="attr-btn"
+                                    data-attr="species_mouse">Mouse</button><button class="attr-btn"
+                                    data-attr="species_human">Human</button><button class="attr-btn"
+                                    data-attr="species_macaque">Macaque</button><button class="attr-btn"
+                                    data-attr="species_guinea_pig">Guinea Pig</button></div>
+                        </div>
+                        <div class="attr-group">
+                            <div class="attr-group-title" onclick="toggleAttrGroup('soma')"><span
+                                    id="toggle-soma">▼</span> Soma Location</div>
+                            <div class="attr-group-content expanded" id="attr-group-soma"><button class="attr-btn"
+                                    data-attr="soma_drg">DRG</button><button class="attr-btn"
+                                    data-attr="soma_tg">Trigeminal</button></div>
+                        </div>
+                        <div class="attr-group">
+                            <div class="attr-group-title" onclick="toggleAttrGroup('source')"><span
+                                    id="toggle-source">▼</span> Source</div>
+                            <div class="attr-group-content expanded" id="attr-group-source"><button class="attr-btn"
+                                    data-attr="source_0">CSA paper</button><button class="attr-btn"
+                                    data-attr="source_1">big DRG paper</button><button class="attr-btn"
+                                    data-attr="source_2">Tavares-Ferreira et al., 2022</button><button class="attr-btn"
+                                    data-attr="source_3">Yu et al., 2024</button><button class="attr-btn"
+                                    data-attr="source_4">Krauter et al., 2025</button><button class="attr-btn"
+                                    data-attr="source_5">Qi et al., 2024</button><button class="attr-btn"
+                                    data-attr="source_6">Kupari et al., 2021</button></div>
+                        </div>
+                        <div class="attr-group">
+                            <div class="attr-group-title" onclick="toggleAttrGroup('genes')"><span
+                                    id="toggle-genes">▶</span> Marker Genes</div>
+                            <div class="attr-group-content collapsed" id="attr-group-genes"></div>
+                        </div>
                     </div>
-                    <div class="cluster-viz-area"><svg id="clusterSvg"></svg><div class="cluster-tooltip" id="clusterTooltip"></div><div class="cluster-instructions">Click nodes for details • Drag to reposition</div></div>
+                    <div class="cluster-viz-area"><svg id="clusterSvg"></svg>
+                        <div class="cluster-tooltip" id="clusterTooltip"></div>
+                        <div class="cluster-instructions">Click nodes for details • Drag to reposition</div>
+                    </div>
                 </div>
+            </div>
+        </div>
+        <div id="lineageViewContainer" class="view-container" style="display:none;">
+            <div class="lineage-container">
+                <h2 class="view-header">Provisional Mapping</h2>
+                <p class="view-note">This diagram represents a provisional mapping of possible relationships between cell
+                    types across publications. Lines between cell types are working hypotheses about equivalences or
+                    subtypes, not independently validated or consensus-endorsed conclusions. The organizational structure
+                    will evolve as evidence accumulates and ontological reasoning is applied.</p>
+                <div class="lineage-content" id="lineageContent">
+                    <div class="lineage-legend">
+                        <div class="lineage-legend-item">
+                            <div
+                                style="width:30px;height:6px;border-top:2px solid #ef4444;border-bottom:2px solid #ef4444;">
+                            </div> Proposed equivalent
+                        </div>
+                        <div class="lineage-legend-item">
+                            <div class="lineage-legend-line" style="background:#8b5cf6;"></div> Proposed subtype
+                        </div>
+                        <div class="lineage-legend-item">
+                            <div
+                                style="width:14px;height:14px;border:2px solid #667eea;border-radius:3px;background:white;">
+                            </div> CSA paper
+                        </div>
+                        <div class="lineage-legend-item">
+                            <div
+                                style="width:14px;height:14px;border:2px solid #f59e0b;border-radius:3px;background:white;">
+                            </div> big DRG paper
+                        </div>
+                        <div class="lineage-legend-item">
+                            <div
+                                style="width:14px;height:14px;border:2px solid #22c55e;border-radius:3px;background:white;">
+                            </div> Tavares-Ferreira
+                        </div>
+                        <div class="lineage-legend-item">
+                            <div
+                                style="width:14px;height:14px;border:2px solid #ef4444;border-radius:3px;background:white;">
+                            </div> Yu et al.
+                        </div>
+                        <div class="lineage-legend-item">
+                            <div
+                                style="width:14px;height:14px;border:2px solid #8b5cf6;border-radius:3px;background:white;">
+                            </div> Krauter et al.
+                        </div>
+                        <div class="lineage-legend-item">
+                            <div
+                                style="width:14px;height:14px;border:2px solid #06b6d4;border-radius:3px;background:white;">
+                            </div> Qi et al.
+                        </div>
+                        <div class="lineage-legend-item">
+                            <div
+                                style="width:14px;height:14px;border:2px solid #ec4899;border-radius:3px;background:white;">
+                            </div> Kupari et al.
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;"><button
+                                class="permalink-btn" onclick="copyLineageLink()">🔗 Copy Link</button></div>
+                        <svg id="lineageSvg" class="lineage-svg"></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="compareViewContainer" class="view-container" style="display:none;">
+            <div class="compare-container">
+                <h2 class="view-header">Compare</h2>
+                <p class="view-note">Congruence shown here reflects only relationships the authors of the anchor source paper
+                    identified. No relationships are inferred beyond what is stated in the source literature.</p>
+                <div class="compare-controls">
+                    <div class="compare-control-group">
+                        <label>Anchor Source:</label>
+                        <select id="compareAnchorSelect"></select>
+                    </div>
+                    <div class="compare-control-group">
+                        <label>Compare With:</label>
+                        <div id="compareSelectors" class="compare-selectors-row"></div>
+                        <button id="compareAddSourceBtn" class="compare-add-btn">+ Add Source</button>
+                        <button id="compareCopyLinkBtn" class="compare-copy-btn">🔗 Copy Link</button>
+                    </div>
+                </div>
+                <div id="compareTableWrapper" class="compare-table-wrapper"></div>
             </div>
         </div>
     </div>
-    <div id="lineageViewContainer" style="display:none;">
-            <div class="lineage-container">
-                <div class="lineage-header">
-                    <div style="display:flex;align-items:center;justify-content:space-between;"><h2>🌳 Lineage View</h2><button class="permalink-btn" onclick="copyLineageLink()">🔗 Copy Link</button></div>
-                    <p>Horizontal relationship tree showing master/species variants (solid blue), asserted equivalences (dashed orange), and asserted subtypes (solid purple). Only cells with relationships are shown.</p>
-                    <div class="lineage-legend">
-                        <div class="legend-item"><div class="legend-line legend-solid-purple"></div><span>Asserted Subtype</span></div>
-                        <div class="legend-item"><div style="width:24px;height:6px;border-top:2px solid #ef4444;border-bottom:2px solid #ef4444;"></div><span>Asserted Equivalence</span></div>
-                    </div>
-                </div>
-                <div class="lineage-content" id="lineageContent">
-                    <svg id="lineageSvg" class="lineage-svg"></svg>
-                </div>
-                <div class="lineage-legend">
-                    <div class="lineage-legend-item"><div style="width:30px;height:6px;border-top:2px solid #ef4444;border-bottom:2px solid #ef4444;"></div> Equivalent (mapsTo)</div>
-                    <div class="lineage-legend-item"><div class="lineage-legend-line" style="background:#8b5cf6;"></div> Asserted subtype</div>
-                    <div class="lineage-legend-item"><div style="width:14px;height:14px;border:2px solid #667eea;border-radius:3px;background:white;"></div> CSA paper</div>
-                    <div class="lineage-legend-item"><div style="width:14px;height:14px;border:2px solid #f59e0b;border-radius:3px;background:white;"></div> big DRG paper</div>
-                    <div class="lineage-legend-item"><div style="width:14px;height:14px;border:2px solid #22c55e;border-radius:3px;background:white;"></div> Tavares-Ferreira</div>
-                    <div class="lineage-legend-item"><div style="width:14px;height:14px;border:2px solid #ef4444;border-radius:3px;background:white;"></div> Yu et al.</div>
-                    <div class="lineage-legend-item"><div style="width:14px;height:14px;border:2px solid #8b5cf6;border-radius:3px;background:white;"></div> Krauter et al.</div>
-                    <div class="lineage-legend-item"><div style="width:14px;height:14px;border:2px solid #06b6d4;border-radius:3px;background:white;"></div> Qi et al.</div>
-                    <div class="lineage-legend-item"><div style="width:14px;height:14px;border:2px solid #ec4899;border-radius:3px;background:white;"></div> Kupari et al.</div>
-                </div>
+    <div id="permalinkToast" class="permalink-toast" style="display:none;">Link copied to clipboard!</div>
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"></h2><button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+    <div class="upload-modal" id="uploadModal">
+        <div class="upload-modal-content">
+            <h2>📁 Load Cell Type Data</h2>
+            <p style="color:#718096;">Upload a CSV or Excel file.</p>
+            <div class="upload-drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <p>📄 Drag & drop your file here</p>
+                <p>or click to browse</p>
+            </div>
+            <div style="margin-top:1.5rem;display:flex;gap:1rem;justify-content:flex-end;"><button
+                    onclick="closeUploadModal()"
+                    style="padding:0.5rem 1rem;background:#edf2f7;border:none;border-radius:6px;cursor:pointer;">Cancel</button><button
+                    onclick="loadDefaultData()"
+                    style="padding:0.5rem 1rem;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;">Reset</button>
             </div>
         </div>
-        <div id="compareViewContainer" style="display:none;">
-            <div class="compare-controls">
-                <div class="compare-control-group">
-                    <label>Anchor Source:</label>
-                    <select id="compareAnchorSelect"></select>
-                </div>
-                <div class="compare-control-group">
-                    <label>Compare With:</label>
-                    <div id="compareSelectors" class="compare-selectors-row"></div>
-                    <button id="compareAddSourceBtn" class="compare-add-btn">+ Add Source</button>
-                </div>
-                <button id="compareCopyLinkBtn" class="compare-copy-btn">🔗 Copy Link</button>
-            </div>
-            <div id="compareTableWrapper" class="compare-table-wrapper"></div>
-        </div>
-        <div id="permalinkToast" class="permalink-toast" style="display:none;">Link copied to clipboard!</div>
-        <div class="modal" id="modal"><div class="modal-content"><div class="modal-header"><h2 id="modalTitle"></h2><button class="close-btn" onclick="closeModal()">×</button></div><div class="modal-body" id="modalBody"></div></div></div>
-    <div class="upload-modal" id="uploadModal"><div class="upload-modal-content"><h2>📁 Load Cell Type Data</h2><p style="color:#718096;">Upload a CSV or Excel file.</p><div class="upload-drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"><p>📄 Drag & drop your file here</p><p>or click to browse</p></div><div style="margin-top:1.5rem;display:flex;gap:1rem;justify-content:flex-end;"><button onclick="closeUploadModal()" style="padding:0.5rem 1rem;background:#edf2f7;border:none;border-radius:6px;cursor:pointer;">Cancel</button><button onclick="loadDefaultData()" style="padding:0.5rem 1rem;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;">Reset</button></div></div></div>
+    </div>
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
 </body>
+
 </html>

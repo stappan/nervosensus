@@ -480,7 +480,7 @@ function applyCardFilters() {
         })();
         const cardRels = getAssertedRelationships(idx);
         const hasAnyRel = cardRels.equivalences.length > 0 || cardRels.subtypeOf.length > 0 || cardRels.hasSubtypes.length > 0;
-        const equivBadge = hasAnyRel ? '<span class="card-badge equiv" title="Has asserted relationships">≡</span>' : '';
+        const equivBadge = hasAnyRel ? '<span class="card-badge equiv" title="Has proposed relationships">≡</span>' : '';
         const subtypeBadge = '';
         
         return `<div class="card-compact" style="border-left-color:${ct.sourceColor||'#667eea'}" data-idx="${idx}">
@@ -502,17 +502,17 @@ function applyCardFilters() {
                     ${(() => {
                         const rels = getAssertedRelationships(idx);
                         if (rels.equivalences.length === 0 && rels.subtypeOf.length === 0 && rels.hasSubtypes.length === 0) return '';
-                        let html = '<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Asserted Relationships</div>';
+                        let html = '<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Proposed Relationships</div>';
                         if (rels.equivalences.length > 0) {
-                            html += '<div class="asserted-equiv-section"><div class="asserted-label">Equivalent to:</div><div class="related-cells">' + 
+                            html += '<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">' + 
                                 rels.equivalences.map(r => `<button class="related-cell-btn equiv-btn" onclick="event.stopPropagation();showModal(${r.idx})">${r.direction === 'to' ? '→' : '←'} ${r.label}</button>`).join('') + '</div></div>';
                         }
                         if (rels.subtypeOf.length > 0) {
-                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Subtype of:</div><div class="related-cells">' + 
+                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Proposed subtype of:</div><div class="related-cells">' + 
                                 rels.subtypeOf.map(r => `<button class="related-cell-btn subtype-btn" onclick="event.stopPropagation();showModal(${r.idx})">↑ ${r.label}</button>`).join('') + '</div></div>';
                         }
                         if (rels.hasSubtypes.length > 0) {
-                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Has subtypes:</div><div class="related-cells">' + 
+                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">' + 
                                 rels.hasSubtypes.map(r => `<button class="related-cell-btn subtype-btn" onclick="event.stopPropagation();showModal(${r.idx})">↓ ${r.label}</button>`).join('') + '</div></div>';
                         }
                         return html + '</div>';
@@ -876,7 +876,7 @@ function renderSynthesisView() {
                         html += '<td class="view-cell" onclick="showModal(' + ct.origIdx + ')" title="View details"><span class="view-icon">👁</span></td>';
                     } else if (col.type === 'name') {
                         let indicators = '';
-                        if (hasEquiv) indicators += '<span class="equiv-indicator" title="Has asserted equivalence - click to group" style="background:#f59e0b;"></span>';
+                        if (hasEquiv) indicators += '<span class="equiv-indicator" title="Has proposed equivalence - click to group" style="background:#f59e0b;"></span>';
                         if (hasSubtype) indicators += '<span class="equiv-indicator" title="Has subtype relationship - click to group" style="background:#8b5cf6;margin-left:' + (hasEquiv ? '2px' : '0') + ';"></span>';
                         html += '<td class="cell-name" onclick="togglePinnedRow(' + ct.origIdx + ')">' + indicators + ct.preferredLabel + '</td>';
                     } else if (col.type === 'source') {
@@ -1983,10 +1983,10 @@ function showModal(idx) {
         if(relationships.equivalences.length > 0) {
             const equivLinks = relationships.equivalences.map(r => {
                 const arrow = r.direction === 'to' ? '→' : '←';
-                const title = r.direction === 'to' ? 'Equivalent to' : 'Equivalent from';
+                const title = r.direction === 'to' ? 'Consistent with' : 'Consistenet with';
                 return `<button class="related-cell-btn equiv-btn" onclick="showModal(${r.idx})" title="${title}">${arrow} ${r.label}</button>`;
             }).join(' ');
-            innerHtml += `<div class="asserted-equiv-section"><div class="asserted-label">Equivalent to:</div><div class="related-cells">${equivLinks}</div></div>`;
+            innerHtml += `<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">${equivLinks}</div></div>`;
         }
         
         // Subtype of
@@ -2002,10 +2002,10 @@ function showModal(idx) {
             const hasSubLinks = relationships.hasSubtypes.map(r => 
                 `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↓ ${r.label}</button>`
             ).join(' ');
-            innerHtml += `<div class="asserted-subtype-section"><div class="asserted-label">Has subtypes:</div><div class="related-cells">${hasSubLinks}</div></div>`;
+            innerHtml += `<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">${hasSubLinks}</div></div>`;
         }
         
-        assertedHtml=`<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Asserted Relationships</div>${innerHtml}</div>`;
+        assertedHtml=`<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Proposed Relationships</div>${innerHtml}</div>`;
     }
     let mapsToHtml = assertedHtml;
     const sourceLinkHtml=ct.sourceNomenclature?`<div class="detail-section"><h3>📚 Source Publication</h3><a href="${ct.sourceNomenclature}" target="_blank" class="source-link">${getSourceLinkText(ct)} ↗</a></div>`:'';
@@ -2236,22 +2236,33 @@ function buildCompareDetailHTML(anchorIdx) {
     const { anchor, compareSources } = getCompareSelections();
     const allowedSources = new Set([anchor, ...compareSources]);
 
-    // Collect related cells, filtered to only selected sources
-    const relatedCells = [];
+    // Collect related cells grouped by source, filtered to only selected sources
+    const cellsBySource = {};
+    for (const src of [anchor, ...compareSources]) { cellsBySource[src] = []; }
     const seenIdx = new Set([anchorIdx]);
     for (const eq of rels.equivalences) {
-        if (!seenIdx.has(eq.idx) && allowedSources.has(CELL_TYPES[eq.idx].sourceNomenclatureLabel)) { relatedCells.push({ ct: CELL_TYPES[eq.idx], idx: eq.idx }); seenIdx.add(eq.idx); }
+        const src = CELL_TYPES[eq.idx].sourceNomenclatureLabel;
+        if (!seenIdx.has(eq.idx) && allowedSources.has(src)) { cellsBySource[src].push({ ct: CELL_TYPES[eq.idx], idx: eq.idx }); seenIdx.add(eq.idx); }
     }
     for (const st of rels.subtypeOf) {
-        if (!seenIdx.has(st.idx) && allowedSources.has(CELL_TYPES[st.idx].sourceNomenclatureLabel)) { relatedCells.push({ ct: CELL_TYPES[st.idx], idx: st.idx }); seenIdx.add(st.idx); }
+        const src = CELL_TYPES[st.idx].sourceNomenclatureLabel;
+        if (!seenIdx.has(st.idx) && allowedSources.has(src)) { cellsBySource[src].push({ ct: CELL_TYPES[st.idx], idx: st.idx }); seenIdx.add(st.idx); }
     }
     for (const hs of rels.hasSubtypes) {
-        if (!seenIdx.has(hs.idx) && allowedSources.has(CELL_TYPES[hs.idx].sourceNomenclatureLabel)) { relatedCells.push({ ct: CELL_TYPES[hs.idx], idx: hs.idx }); seenIdx.add(hs.idx); }
+        const src = CELL_TYPES[hs.idx].sourceNomenclatureLabel;
+        if (!seenIdx.has(hs.idx) && allowedSources.has(src)) { cellsBySource[src].push({ ct: CELL_TYPES[hs.idx], idx: hs.idx }); seenIdx.add(hs.idx); }
     }
-    // Sort related cells to match the main table's column order (compareSources order)
-    const sourceOrder = [anchor, ...compareSources];
-    relatedCells.sort((a, b) => sourceOrder.indexOf(a.ct.sourceNomenclatureLabel) - sourceOrder.indexOf(b.ct.sourceNomenclatureLabel));
-    const allCells = [{ ct: anchorCt, idx: anchorIdx }, ...relatedCells];
+
+    // Build ordered column list: anchor cell first, then one column per comparison source
+    // Sources with related cells get one column per related cell; sources without get a placeholder
+    const columns = [{ ct: anchorCt, idx: anchorIdx, empty: false }]; // anchor always first
+    for (const src of compareSources) {
+        if (cellsBySource[src].length > 0) {
+            for (const cell of cellsBySource[src]) { columns.push({ ...cell, empty: false }); }
+        } else {
+            columns.push({ ct: null, idx: null, empty: true, source: src }); // placeholder
+        }
+    }
 
     // Phenotype rows
     const phenotypeRows = [
@@ -2282,9 +2293,10 @@ function buildCompareDetailHTML(anchorIdx) {
         }}
     ];
 
-    // Compute values and shared genes
+    // Compute shared genes across all real (non-empty) cells
+    const realCells = columns.filter(c => !c.empty);
     const allGenes = new Map();
-    for (const { ct } of allCells) {
+    for (const { ct } of realCells) {
         if (ct.markerGenes) {
             const seen = new Set();
             for (const g of ct.markerGenes) {
@@ -2302,27 +2314,40 @@ function buildCompareDetailHTML(anchorIdx) {
     let html = '<div class="compare-detail-inline">';
     html += `<div class="compare-detail-header"><h3>Phenotype Comparison: ${getDisplayLabel(anchorCt)}</h3></div>`;
     html += '<table class="compare-detail-table"><thead><tr><th style="background:#4a5568;">Phenotype</th>';
-    for (const { ct, idx } of allCells) {
-        const color = getSourceColor(ct.sourceNomenclatureLabel);
-        html += `<th style="background:${color};"><span class="compare-cell-link" onclick="showModal(${idx})" style="color:white;text-decoration:underline dotted rgba(255,255,255,0.5);">${getDisplayLabel(ct)}</span><br><span style="font-weight:400;font-size:0.7rem;opacity:0.8;">${ct.sourceNomenclatureLabel}</span></th>`;
+    for (const col of columns) {
+        if (col.empty) {
+            const color = getSourceColor(col.source);
+            html += `<th style="background:${color};"><span style="opacity:0.7;">–</span><br><span style="font-weight:400;font-size:0.7rem;opacity:0.8;">${col.source}</span></th>`;
+        } else {
+            const color = getSourceColor(col.ct.sourceNomenclatureLabel);
+            html += `<th style="background:${color};"><span class="compare-cell-link" onclick="showModal(${col.idx})" style="color:white;text-decoration:underline dotted rgba(255,255,255,0.5);">${getDisplayLabel(col.ct)}</span><br><span style="font-weight:400;font-size:0.7rem;opacity:0.8;">${col.ct.sourceNomenclatureLabel}</span></th>`;
+        }
     }
     html += '</tr></thead><tbody>';
 
     for (const pRow of phenotypeRows) {
-        const values = allCells.map(({ ct }) => pRow.getValue(ct));
-        const allSame = values.every(v => v === values[0]);
+        const values = columns.map(col => col.empty ? '–' : pRow.getValue(col.ct));
+        const realValues = values.filter((_, i) => !columns[i].empty);
+        const allSame = realValues.length > 1 && realValues.every(v => v === realValues[0]);
         html += '<tr>';
         html += `<td>${pRow.label}</td>`;
 
-        for (let i = 0; i < allCells.length; i++) {
+        for (let i = 0; i < columns.length; i++) {
+            const col = columns[i];
             const val = values[i];
+
+            if (col.empty) {
+                html += '<td style="text-align:center;color:#a0aec0;">–</td>';
+                continue;
+            }
+
             let cellClass = '';
-            if (allCells.length > 1) {
+            if (realCells.length > 1) {
                 cellClass = allSame ? 'compare-match' : 'compare-diff';
             }
 
             if (pRow.key === 'genes' && val !== '—') {
-                const genes = allCells[i].ct.markerGenes.map(g => {
+                const genes = col.ct.markerGenes.map(g => {
                     const isShared = sharedGenes.has(g.name.toLowerCase());
                     return `<span class="${isShared ? 'compare-gene-shared' : ''}">${g.name}</span>`;
                 }).join(', ');

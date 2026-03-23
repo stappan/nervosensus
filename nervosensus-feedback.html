@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nervosensus — Feedback</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --border: #dde2ea;
+      --border-strong: #b8c0cc;
+      --text-primary: #1c2333;
+      --text-secondary: #3d4a5c;
+      --text-muted: #5a6a7e;
+      --accent: #667eea;
+      --accent-dark: #5a6fd6;
+      --accent-light: #eef1fd;
+      --accent-mid: #667eea;
+      --selected-bg: #eef1fd;
+      --selected-text: #3451b2;
+      --danger: #c0392b;
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --mono: 'Segoe UI Mono', 'Cascadia Code', monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 3rem 1rem 5rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .wordmark {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin-bottom: 2.5rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .wordmark::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 2.5rem;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+    }
+
+    .field {
+      margin-bottom: 1.75rem;
+    }
+
+    .field:last-child {
+      margin-bottom: 0;
+    }
+
+    .field-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .optional-tag {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      letter-spacing: 0.05em;
+    }
+
+    .field-hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
+    .view-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--accent-light);
+      border: 1px solid #c5cffa;
+      border-radius: 100px;
+      padding: 5px 12px 5px 9px;
+      font-size: 13px;
+      color: var(--selected-text);
+      font-weight: 500;
+    }
+
+    .view-pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.75rem 0;
+    }
+
+    .scale-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .scale-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .scale-row input[type=radio] { display: none; }
+
+    .scale-row label {
+      flex: 1;
+      text-align: center;
+      padding: 10px 6px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.12s ease;
+      background: var(--surface);
+    }
+
+    .scale-row label:hover {
+      border-color: var(--border-strong);
+      color: var(--text-primary);
+      background: #f0f2f8;
+    }
+
+    .scale-row input[type=radio]:checked + label {
+      background: var(--selected-bg);
+      color: var(--selected-text);
+      border-color: #c5cffa;
+      font-weight: 500;
+    }
+
+    .scale-ends {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: var(--mono);
+      letter-spacing: 0.03em;
+    }
+
+    textarea,
+    input[type=text] {
+      width: 100%;
+      font-family: var(--font);
+      font-size: 14px;
+      color: var(--text-primary);
+      background: #f9fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      line-height: 1.6;
+      outline: none;
+      transition: border-color 0.12s;
+      -webkit-appearance: none;
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    textarea:focus,
+    input[type=text]:focus {
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+
+    textarea::placeholder,
+    input[type=text]::placeholder {
+      color: var(--text-muted);
+    }
+
+    .error-msg {
+      font-size: 12px;
+      color: var(--danger);
+      margin-bottom: 12px;
+      display: none;
+      font-family: var(--mono);
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--surface);
+      background: #667eea;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.12s, transform 0.08s;
+      letter-spacing: 0.01em;
+    }
+
+    .submit-btn:hover { background: var(--accent-dark); }
+    .submit-btn:active { transform: scale(0.99); }
+    .submit-btn:disabled { background: var(--border-strong); cursor: not-allowed; transform: none; }
+
+    /* Success state */
+    .success {
+      display: none;
+      text-align: center;
+      padding: 2.5rem 1rem;
+    }
+
+    .success-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent-light);
+      border: 1px solid #c5cffa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+
+    .success-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--accent);
+      fill: none;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .success h2 {
+      font-size: 17px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    .success p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 2rem 1rem 4rem; }
+      .card { padding: 1.5rem; }
+      h1 { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="wordmark">Nervosensus</div>
+    <h1>Share your feedback</h1>
+    <p class="subtitle">Help us improve — takes about a minute.</p>
+
+    <div class="card">
+      <div id="form-content">
+
+        <div class="field">
+          <div class="field-label">Current view</div>
+          <div class="view-pill">
+            <span class="view-pill-dot"></span>
+            <span id="view-label">—</span>
+          </div>
+          <input type="hidden" id="view-value" value="">
+        </div>
+
+        <hr class="divider">
+
+        <div class="field">
+          <div class="field-label">How interested are you in cell phenotyping?</div>
+          <div class="scale-wrap">
+            <div class="scale-row">
+              <input type="radio" name="phenotyping" id="p1" value="1"><label for="p1">1</label>
+              <input type="radio" name="phenotyping" id="p2" value="2"><label for="p2">2</label>
+              <input type="radio" name="phenotyping" id="p3" value="3"><label for="p3">3</label>
+              <input type="radio" name="phenotyping" id="p4" value="4"><label for="p4">4</label>
+              <input type="radio" name="phenotyping" id="p5" value="5"><label for="p5">5</label>
+            </div>
+            <div class="scale-ends"><span>Not at all interested</span><span>Very interested</span></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">How familiar are you with PRECISION datasets?</div>
+          <div class="scale-wrap">
+            <div class="scale-row">
+              <input type="radio" name="precision" id="pr1" value="1"><label for="pr1">1</label>
+              <input type="radio" name="precision" id="pr2" value="2"><label for="pr2">2</label>
+              <input type="radio" name="precision" id="pr3" value="3"><label for="pr3">3</label>
+              <input type="radio" name="precision" id="pr4" value="4"><label for="pr4">4</label>
+              <input type="radio" name="precision" id="pr5" value="5"><label for="pr5">5</label>
+            </div>
+            <div class="scale-ends"><span>Not at all familiar</span><span>Very familiar</span></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">How helpful do you find this tool?</div>
+          <div class="scale-wrap">
+            <div class="scale-row">
+              <input type="radio" name="helpful" id="h1" value="1"><label for="h1">1</label>
+              <input type="radio" name="helpful" id="h2" value="2"><label for="h2">2</label>
+              <input type="radio" name="helpful" id="h3" value="3"><label for="h3">3</label>
+              <input type="radio" name="helpful" id="h4" value="4"><label for="h4">4</label>
+              <input type="radio" name="helpful" id="h5" value="5"><label for="h5">5</label>
+            </div>
+            <div class="scale-ends"><span>Not helpful</span><span>Extremely helpful</span></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Any other feedback? <span class="optional-tag">optional</span></div>
+          <div class="field-hint">What's working, what's confusing, or what you'd like to see.</div>
+          <textarea id="comments" placeholder="Your thoughts..."></textarea>
+        </div>
+
+        <hr class="divider">
+
+        <div class="field">
+          <div class="field-label">Your name or email <span class="optional-tag">optional</span></div>
+          <div class="field-hint">Only if you'd like us to follow up with you.</div>
+          <input type="text" id="respondent" placeholder="e.g. Jane Smith or jane@example.com">
+        </div>
+
+        <p class="error-msg" id="error-msg">Please answer all three scale questions before submitting.</p>
+        <button class="submit-btn" id="submit-btn" onclick="submitForm()">Submit feedback</button>
+
+      </div>
+
+      <div class="success" id="success-msg">
+        <div class="success-icon">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <h2>Thank you!</h2>
+        <p>Your feedback has been recorded.<br>We really appreciate you taking the time.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const FORM_ACTION = "https://docs.google.com/forms/d/e/1FAIpQLSem5PPT_ikcaO24dPtcxDSZCLA76qzzYZaKNja-Nglu0U3QAA/formResponse";
+
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view') || 'Unknown view';
+    document.getElementById('view-label').textContent = view;
+    document.getElementById('view-value').value = view;
+
+    function submitForm() {
+      const phenotyping = document.querySelector('input[name="phenotyping"]:checked')?.value;
+      const precision   = document.querySelector('input[name="precision"]:checked')?.value;
+      const helpful     = document.querySelector('input[name="helpful"]:checked')?.value;
+      const errEl       = document.getElementById('error-msg');
+
+      if (!phenotyping || !precision || !helpful) {
+        errEl.style.display = 'block';
+        return;
+      }
+      errEl.style.display = 'none';
+
+      const comments   = document.getElementById('comments').value;
+      const respondent = document.getElementById('respondent').value;
+      const viewVal    = document.getElementById('view-value').value;
+
+      const body = new URLSearchParams({
+        'entry.1433955340': viewVal,
+        'entry.1421333631': phenotyping,
+        'entry.1988849246': precision,
+        'entry.1907745440': helpful,
+        'entry.311315686':  comments,
+        'entry.440708749':  respondent,
+      });
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+
+      fetch(FORM_ACTION, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      }).then(() => {
+        document.getElementById('form-content').style.display = 'none';
+        document.getElementById('success-msg').style.display  = 'block';
+      }).catch(() => {
+        btn.disabled = false;
+        btn.textContent = 'Submit feedback';
+        errEl.textContent = 'Something went wrong — please try again.';
+        errEl.style.display = 'block';
+      });
+    }
+  </script>
+</body>
+</html>

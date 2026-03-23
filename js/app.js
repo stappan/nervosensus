@@ -419,6 +419,8 @@ function initGeneButtons() {
 }
 
 function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); closeUploadModal(); selectedAttributes=[]; renderCards(); }
+const VIEW_NAMES = { cards: 'Card View', tree: 'Tree View', synthesis: 'Synthesis View', cluster: 'Cluster View', lineage: 'Provisional Mapping', compare: 'Compare' };
+function openFeedback() { const name = VIEW_NAMES[currentView] || currentView; window.open('nervosensus-feedback.html?view=' + encodeURIComponent(name), '_blank'); }
 function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); }
 
 

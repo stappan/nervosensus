@@ -406,9 +406,35 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
     border-bottom: 2px solid #e2e8f0;
 }
 .view-container {
-	padding: 2rem; 
-	background: white; 
-	border-radius: 12px; 
-	box-shadow: 0 2px 8px rgba(0,0,0,0.1);     
+	padding: 2rem;
+	background: white;
+	border-radius: 12px;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 	overflow: hidden;
 }
+
+/* Cell Detail Full Page */
+.cell-detail-page { max-width: 960px; margin: 0 auto; }
+.cell-detail-back { margin-bottom: 1.25rem; }
+.cell-detail-back a { color: #667eea; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+.cell-detail-back a:hover { text-decoration: underline; }
+.cell-detail-header { margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.cell-detail-source-bar { width: 6px; height: 2.5rem; border-radius: 3px; flex-shrink: 0; }
+.cell-detail-header h1 { font-size: 1.5rem; color: #2d3748; margin: 0; flex: 1; }
+.cell-detail-source-label { font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.cell-detail-body { margin-bottom: 2rem; }
+.cell-detail-body .detail-section { margin-bottom: 1.25rem; }
+.cell-detail-body .detail-section h3 { color: #4a5568; margin-bottom: 0.5rem; font-size: 1rem; }
+.related-source-cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.6rem; margin-top: 0.75rem; }
+.related-source-cell-link { display: block; padding: 0.6rem 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-decoration: none; color: #2d3748; transition: all 0.2s; }
+.related-source-cell-link:hover { background: #f0f4ff; border-color: #667eea; box-shadow: 0 2px 6px rgba(102,126,234,0.15); }
+.related-source-cell-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.2rem; }
+.related-source-cell-meta { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #718096; }
+.related-source-cell-species { text-transform: capitalize; }
+
+/* Modal detail link */
+.modal-detail-link { color: #667eea; text-decoration: none; font-size: 0.8rem; font-weight: 600; margin-left: auto; margin-right: 0.5rem; white-space: nowrap; }
+.modal-detail-link:hover { text-decoration: underline; }
+.modal-newtab-btn { background: none; border: 1px solid #e2e8f0; border-radius: 4px; color: #667eea; font-size: 0.85rem; cursor: pointer; padding: 0.15rem 0.4rem; line-height: 1; transition: all 0.15s; }
+.modal-newtab-btn:hover { background: #667eea; color: white; border-color: #667eea; }
+#modalDetailLink { display: flex; align-items: center; gap: 0.3rem; margin-left: auto; margin-right: 0.75rem; }

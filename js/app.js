@@ -12,7 +12,15 @@ function isMasterCell(ct) {
 
 let FAMILIES = JSON.parse(JSON.stringify(DEFAULT_FAMILIES));
 let GENES = JSON.parse(JSON.stringify(DEFAULT_GENES));
-let currentView = 'cards';
+
+function buildIdIndex() {
+    const map = {};
+    CELL_TYPES.forEach((ct, i) => { if (ct.id) map[ct.id] = i; });
+    return map;
+}
+let ID_INDEX = buildIdIndex();
+
+let currentView = 'cluster';
 let treeGrouping = 'location';
 const AXON_LABELS = { 'type a nerve fiber': 'A fiber', 'type ab (beta) nerve fiber': 'Aβ fiber', 'type ad (delta) nerve fiber': 'Aδ fiber', 'type c nerve fiber': 'C fiber' };
 
@@ -23,6 +31,8 @@ let synthesisPinnedIdx = null;
 let clusterCenters = {};
 let nodeRadius = 14;
 let enclosureTimer = null;
+let clusterWidth = 0, clusterHeight = 0;
+let clusterNodeSelection = null;
 
 // Species labels used instead of icons
 const ATTR_LABELS = { source_0:'CSA paper', source_1:'big DRG paper', source_2:'Tavares-Ferreira et al., 2022', source_3:'Yu et al., 2024', source_4:'Krauter et al., 2025', source_5:'Qi et al., 2024', source_6:'Kupari et al., 2021',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprioceptive', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'Guinea Pig', soma_drg:'DRG', soma_tg:'Trigeminal' };
@@ -418,10 +428,10 @@ function initGeneButtons() {
     });
 }
 
-function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); closeUploadModal(); selectedAttributes=[]; renderCards(); }
+function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); ID_INDEX=buildIdIndex(); closeUploadModal(); selectedAttributes=[]; renderCards(); }
 const VIEW_NAMES = { cards: 'Card View', tree: 'Tree View', synthesis: 'Synthesis View', cluster: 'Cluster View', lineage: 'Provisional Mapping', compare: 'Compare' };
 function openFeedback() { const name = VIEW_NAMES[currentView] || currentView; window.open('nervosensus-feedback.html?view=' + encodeURIComponent(name), '_blank'); }
-function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); }
+function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cellDetailViewContainer').style.display='none'; document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); if(location.hash.startsWith('#cell/'))history.replaceState(null,'',location.pathname+location.search); }
 
 
 function setTreeGrouping(grouping) {
@@ -500,26 +510,26 @@ function applyCardFilters() {
                     ${ct.geneExpressionString ? `<div class="card-section"><div class="section-title">🧬 Marker Genes</div><div class="gene-display">${formatGeneExpression(ct.geneExpressionString)}</div></div>` : ''}
                     ${ct.fiberTypeString ? `<div class="card-section"><div class="section-title">🔬 Axon Phenotype</div><div class="gene-display">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>` : ''}
                     ${ct.physiologyString ? `<div class="card-section"><div class="section-title">⚡ Physiology</div><div class="gene-display">${formatGeneExpression(ct.physiologyString)}</div></div>` : ''}
-                    ${ct.relatedCells && ct.relatedCells.length > 0 ? `<div class="card-section"><div class="section-title">🔗 Related Variants</div><div class="related-cells">${ct.relatedCells.map(rc => `<button class="related-cell-btn" onclick="event.stopPropagation();showModalByName('${rc.label.replace(/'/g, "\\'")}')">${rc.label}</button>`).join('')}</div></div>` : ''}
+                    ${ct.relatedCells && ct.relatedCells.length > 0 ? `<div class="card-section"><div class="section-title">🔗 Related Variants</div><div class="related-cells">${ct.relatedCells.map(rc => `<button class="related-cell-btn" onclick="event.stopPropagation();${rc.id ? `openCellById('${rc.id}')` : `showModalByName('${rc.label.replace(/'/g, "\\'")}')`}">${rc.label}</button>`).join('')}</div></div>` : ''}
                     ${(() => {
                         const rels = getAssertedRelationships(idx);
                         if (rels.equivalences.length === 0 && rels.subtypeOf.length === 0 && rels.hasSubtypes.length === 0) return '';
                         let html = '<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Proposed Relationships</div>';
                         if (rels.equivalences.length > 0) {
-                            html += '<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">' + 
-                                rels.equivalences.map(r => `<button class="related-cell-btn equiv-btn" onclick="event.stopPropagation();showModal(${r.idx})">${r.direction === 'to' ? '→' : '←'} ${r.label}</button>`).join('') + '</div></div>';
+                            html += '<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">' +
+                                rels.equivalences.map(r => `<a href="#cell/${r.id}" class="related-cell-btn equiv-btn" onclick="event.stopPropagation();">${r.direction === 'to' ? '→' : '←'} ${r.label}</a>`).join('') + '</div></div>';
                         }
                         if (rels.subtypeOf.length > 0) {
-                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Proposed subtype of:</div><div class="related-cells">' + 
-                                rels.subtypeOf.map(r => `<button class="related-cell-btn subtype-btn" onclick="event.stopPropagation();showModal(${r.idx})">↑ ${r.label}</button>`).join('') + '</div></div>';
+                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Proposed subtype of:</div><div class="related-cells">' +
+                                rels.subtypeOf.map(r => `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn" onclick="event.stopPropagation();">↑ ${r.label}</a>`).join('') + '</div></div>';
                         }
                         if (rels.hasSubtypes.length > 0) {
-                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">' + 
-                                rels.hasSubtypes.map(r => `<button class="related-cell-btn subtype-btn" onclick="event.stopPropagation();showModal(${r.idx})">↓ ${r.label}</button>`).join('') + '</div></div>';
+                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">' +
+                                rels.hasSubtypes.map(r => `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn" onclick="event.stopPropagation();">↓ ${r.label}</a>`).join('') + '</div></div>';
                         }
                         return html + '</div>';
                     })()}
-                    <button style="margin-top:1rem;padding:0.5rem 1rem;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;" onclick="event.stopPropagation();showModal(${idx})">View Full Details</button>
+                    <a href="#cell/${ct.id}" style="display:inline-block;margin-top:1rem;padding:0.5rem 1rem;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;text-decoration:none;" onclick="event.stopPropagation();">View Full Details</a>
                 </div>
             </div>
         </div>`;
@@ -566,7 +576,7 @@ function renderTreeView() {
             fn = fn.trim();
             const fk = fn.toLowerCase();
             if (!fm[fk]) fm[fk] = {name: fn, children: []};
-            fm[fk].children.push(ct.preferredLabel);
+            fm[fk].children.push({id: ct.id, label: ct.preferredLabel});
         });
         return Object.values(fm);
     }
@@ -577,9 +587,11 @@ function renderTreeView() {
             const uid = parentGi + '-' + fi;
             famHtml += '<div class="tree-item"><div class="tree-master" onclick="toggleFamily(\'' + uid + '\')"><span class="tree-toggle" id="toggle-' + uid + '">▶</span><div style="display:inline-block;vertical-align:top;"><div class="tree-master-name">' + formatGeneExpression(fam.name) + '</div><div class="tree-master-count">' + fam.children.length + ' variants</div></div></div><div class="tree-children" id="children-' + uid + '">';
             fam.children.forEach(ch => {
-                const ct = CELL_TYPES.find(x => x.preferredLabel === ch);
-                const safeLabel = ch.replace(/'/g, "\\'");
-                famHtml += '<div class="tree-child" onclick="showModalByName(\'' + safeLabel + '\')"><div class="tree-child-name">' + ch + '</div>' + (ct ? '<div class="tree-child-species">🧬 ' + (ct.geneExpressionString ? formatGeneExpression(ct.geneExpressionString) : 'No marker genes') + '</div>' : '') + '</div>';
+                const childId = ch.id || '';
+                const childLabel = ch.label || ch;
+                const ct = childId ? CELL_TYPES[ID_INDEX[childId]] : CELL_TYPES.find(x => x.preferredLabel === childLabel);
+                const onclick = childId ? "openCellById('" + childId + "')" : "showModalByName('" + childLabel.replace(/'/g, "\\'") + "')";
+                famHtml += '<div class="tree-child" onclick="' + onclick + '"><div class="tree-child-name">' + childLabel + '</div>' + (ct ? '<div class="tree-child-species">🧬 ' + (ct.geneExpressionString ? formatGeneExpression(ct.geneExpressionString) : 'No marker genes') + '</div>' : '') + '</div>';
             });
             famHtml += '</div></div>';
         });
@@ -703,7 +715,7 @@ function renderSynthesisView() {
     CELL_TYPES.filter(ct => !isMasterCell(ct)).forEach((ct, idx) => {
         if (ct.mapsTo && ct.mapsTo.length > 0) {
             ct.mapsTo.forEach(m => {
-                const targetIdx = CELL_TYPES.findIndex(c => c.entity === m.label);
+                const targetIdx = m.id ? (ID_INDEX[m.id] ?? -1) : CELL_TYPES.findIndex(c => c.entity === m.label);
                 if (targetIdx !== -1) {
                     equivMap[idx] = targetIdx;
                     equivMap[targetIdx] = idx;
@@ -1000,7 +1012,7 @@ function togglePinnedRow(idx) {
 function highlightEquivPair(idx) { highlightRelationships(idx); }
 function clearEquivHighlight() { clearRelationshipHighlights(); }
 
-function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); svg.attr('width',width).attr('height',height); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,id:i,x:width/2+(Math.random()-0.5)*width*0.6,y:height/2+(Math.random()-0.5)*height*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(width/2,height/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
+function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,id:i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
 
 function clearAllFilters() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); updateClusterLegend(); updateClusterStats(); updateClusterVisualization(); }
 function updateSelectedDisplay() { const display=document.getElementById('selectedAttrsDisplay'); if(selectedAttributes.length===0){display.textContent='No attributes selected';}else{const labels=selectedAttributes.map(a=>{if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);return gene?gene.display:a;}return ATTR_LABELS[a]||a;});display.textContent=`Selected (${labels.length}): ${labels.join(', ')}`;} }
@@ -1112,7 +1124,7 @@ function calculateClusterCenters(w,h) {
                 y: centerY + radius * Math.sin(angle) * 0.85
             };
         }); } }
-function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); clusterNodes.forEach(n=>n.radius=nodeRadius); calculateClusterCenters(width,height); if(enclosureTimer){clearTimeout(enclosureTimer);enclosureTimer=null;} if(selectedAttributes.length>0){clusterSimulation.force('radial',null).force('x',d3.forceX(d=>clusterCenters[getClusterKey(d)]?.x||width/2).strength(0.85)).force('y',d3.forceY(d=>clusterCenters[getClusterKey(d)]?.y||height/2).strength(0.85)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.9));}else{clusterSimulation.force('radial',null).force('x',d3.forceX(width/2).strength(0.3)).force('y',d3.forceY(height/2).strength(0.3)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+2).strength(0.8));} clusterSimulation.alpha(0.8).restart(); const ns=svg.select('.nodes').selectAll('.cluster-node').data(clusterNodes,d=>d.id); const ne=ns.enter().append('circle').attr('class','cluster-node').attr('r',d=>d.radius).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded)).on('mouseover',showClusterTooltip).on('mousemove',moveClusterTooltip).on('mouseout',hideClusterTooltip).on('click',(e,d)=>showModal(d.id)); ns.merge(ne).transition().duration(300)
+function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); clusterNodes.forEach(n=>n.radius=nodeRadius); calculateClusterCenters(clusterWidth,clusterHeight); if(enclosureTimer){clearTimeout(enclosureTimer);enclosureTimer=null;} if(selectedAttributes.length>0){clusterSimulation.force('radial',null).force('x',d3.forceX(d=>clusterCenters[getClusterKey(d)]?.x||clusterWidth/2).strength(0.85)).force('y',d3.forceY(d=>clusterCenters[getClusterKey(d)]?.y||clusterHeight/2).strength(0.85)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.9));}else{clusterSimulation.force('radial',null).force('x',d3.forceX(clusterWidth/2).strength(0.3)).force('y',d3.forceY(clusterHeight/2).strength(0.3)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+2).strength(0.8));} clusterSimulation.alpha(0.5).restart(); const ns=svg.select('.nodes').selectAll('.cluster-node').data(clusterNodes,d=>d.id); const ne=ns.enter().append('circle').attr('class','cluster-node').attr('r',d=>d.radius).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded)).on('mouseover',showClusterTooltip).on('mousemove',moveClusterTooltip).on('mouseout',hideClusterTooltip).on('click',(e,d)=>showModal(d.id)); clusterNodeSelection=ns.merge(ne); clusterNodeSelection.transition().duration(300)
         .attr('r', d => {
             if(selectedAttributes.length >= 2) {
                 const mc = selectedAttributes.map(a => cellMatchesAttr(d, a)).filter(Boolean).length;
@@ -1121,18 +1133,17 @@ function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); cons
             return d.radius;
         })
         .attr('fill',d=>getNodeColor(d)).attr('stroke',d=>d.sourceColor||'#667eea').attr('stroke-width', 2.5);
-    
-    // Add/remove all-match class for glow effect
-    svg.select('.nodes').selectAll('.cluster-node').classed('all-match', d => {
+
+    clusterNodeSelection.classed('all-match', d => {
         if(selectedAttributes.length >= 2) {
             const mc = selectedAttributes.map(a => cellMatchesAttr(d, a)).filter(Boolean).length;
             return mc === selectedAttributes.length;
         }
         return false;
     });
-    
+
     scheduleEnclosureRedraw(); }
-function scheduleEnclosureRedraw() { if(enclosureTimer)clearTimeout(enclosureTimer); enclosureTimer=setTimeout(()=>{drawClusterEnclosures();enclosureTimer=setTimeout(()=>{drawClusterEnclosures();enclosureTimer=setTimeout(drawClusterEnclosures,800);},600);},400); }
+function scheduleEnclosureRedraw() { if(enclosureTimer)clearTimeout(enclosureTimer); enclosureTimer=setTimeout(()=>{drawClusterEnclosures();enclosureTimer=null;},500); }
 function drawClusterEnclosures() { const svg=d3.select('#clusterSvg'); svg.select('.enclosures').selectAll('*').remove(); svg.select('.labels').selectAll('*').remove(); if(selectedAttributes.length===0)return; const clusters={}; clusterNodes.forEach(n=>{const k=getClusterKey(n);if(!clusters[k])clusters[k]=[];clusters[k].push(n);}); Object.entries(clusters).forEach(([key,nodes])=>{if(nodes.length===0)return; const pad=nodeRadius*1.2; const minX=d3.min(nodes,d=>d.x)-pad,maxX=d3.max(nodes,d=>d.x)+pad; const minY=d3.min(nodes,d=>d.y)-pad,maxY=d3.max(nodes,d=>d.y)+pad; const cx=(minX+maxX)/2,cy=(minY+maxY)/2; const rx=Math.max((maxX-minX)/2,nodeRadius*2.5); const ry=Math.max((maxY-minY)/2,nodeRadius*2.5); const color=getClusterColor(key),label=getClusterLabel(key); const isAllCluster = selectedAttributes.length >= 2 && key.split('').filter(c=>c==='1').length === selectedAttributes.length;
         svg.select('.enclosures').append('ellipse')
             .attr('class', 'cluster-enclosure' + (isAllCluster ? ' all-enclosure' : ''))
@@ -1140,20 +1151,15 @@ function drawClusterEnclosures() { const svg=d3.select('#clusterSvg'); svg.selec
             .attr('rx',rx+2).attr('ry',ry+2)
             .attr('stroke',color)
             .attr('fill', isAllCluster ? 'rgba(255, 215, 0, 0.15)' : 'none'); const lt=`${label} (${nodes.length})`,ly=Math.max(18, minY-6),tw=lt.length*5.5+12; svg.select('.labels').append('rect').attr('class','cluster-label-bg').attr('x',cx-tw/2).attr('y',ly-10).attr('width',tw).attr('height',16); svg.select('.labels').append('text').attr('class','cluster-label').attr('x',cx).attr('y',ly+2).attr('fill',color).text(lt);}); }
-function clusterTicked() { 
-    const container = document.querySelector('.cluster-viz-area');
-    const w = container.clientWidth, h = container.clientHeight;
+function clusterTicked() {
     const padding = nodeRadius + 5;
-    
-    // Clamp nodes to stay within viewport bounds
     clusterNodes.forEach(d => {
-        d.x = Math.max(padding, Math.min(w - padding, d.x));
-        d.y = Math.max(padding + 20, Math.min(h - padding, d.y)); // +20 for label space at top
+        d.x = Math.max(padding, Math.min(clusterWidth - padding, d.x));
+        d.y = Math.max(padding + 20, Math.min(clusterHeight - padding, d.y));
     });
-    
-    d3.select('#clusterSvg').select('.nodes').selectAll('.cluster-node')
-        .attr('cx', d => d.x)
-        .attr('cy', d => d.y); 
+    if (clusterNodeSelection) {
+        clusterNodeSelection.attr('cx', d => d.x).attr('cy', d => d.y);
+    }
 }
 function dragStarted(e,d) { if(!e.active)clusterSimulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y; }
 function dragged(e,d) { d.fx=e.x;d.fy=e.y; }
@@ -1216,46 +1222,48 @@ function getAssertedRelationships(cellIdx) {
     // Get direct mapsTo (equivalences)
     if (ct.mapsTo && ct.mapsTo.length > 0) {
         ct.mapsTo.forEach(m => {
-            if (!m.label) return;
-            const targetIdx = CELL_TYPES.findIndex(c => c.entity === m.label);
+            if (!m.label && !m.id) return;
+            const targetIdx = m.id ? (ID_INDEX[m.id] ?? -1) : CELL_TYPES.findIndex(c => c.entity === m.label);
             if (targetIdx !== -1) {
-                result.equivalences.push({ label: CELL_TYPES[targetIdx].preferredLabel, idx: targetIdx, direction: 'to' });
+                result.equivalences.push({ label: CELL_TYPES[targetIdx].preferredLabel, idx: targetIdx, id: CELL_TYPES[targetIdx].id, direction: 'to' });
             }
         });
     }
-    
+
     // Find cells that map TO this cell (reverse equivalences)
     CELL_TYPES.forEach((other, otherIdx) => {
         if (otherIdx === cellIdx) return;
         if (other.mapsTo && other.mapsTo.length > 0) {
             other.mapsTo.forEach(m => {
-                if (m.label === ct.entity) {
+                const matches = (m.id && ct.id) ? m.id === ct.id : m.label === ct.entity;
+                if (matches) {
                     if (!result.equivalences.find(r => r.idx === otherIdx)) {
-                        result.equivalences.push({ label: other.preferredLabel, idx: otherIdx, direction: 'from' });
+                        result.equivalences.push({ label: other.preferredLabel, idx: otherIdx, id: other.id, direction: 'from' });
                     }
                 }
             });
         }
     });
-    
+
     // Get direct assertedSubclassOf (this cell is a subtype of...)
     if (ct.assertedSubclassOf && ct.assertedSubclassOf.length > 0) {
         ct.assertedSubclassOf.forEach(s => {
-            if (!s.label) return;
-            const targetIdx = CELL_TYPES.findIndex(c => c.entity === s.label);
+            if (!s.label && !s.id) return;
+            const targetIdx = s.id ? (ID_INDEX[s.id] ?? -1) : CELL_TYPES.findIndex(c => c.entity === s.label);
             if (targetIdx !== -1) {
-                result.subtypeOf.push({ label: CELL_TYPES[targetIdx].preferredLabel, idx: targetIdx });
+                result.subtypeOf.push({ label: CELL_TYPES[targetIdx].preferredLabel, idx: targetIdx, id: CELL_TYPES[targetIdx].id });
             }
         });
     }
-    
+
     // Find cells that are subtypes OF this cell (reverse)
     CELL_TYPES.forEach((other, otherIdx) => {
         if (otherIdx === cellIdx) return;
         if (other.assertedSubclassOf && other.assertedSubclassOf.length > 0) {
             other.assertedSubclassOf.forEach(s => {
-                if (s.label === ct.entity) {
-                    result.hasSubtypes.push({ label: other.preferredLabel, idx: otherIdx });
+                const matches = (s.id && ct.id) ? s.id === ct.id : s.label === ct.entity;
+                if (matches) {
+                    result.hasSubtypes.push({ label: other.preferredLabel, idx: otherIdx, id: other.id });
                 }
             });
         }
@@ -1291,38 +1299,31 @@ function renderLineageView() {
     };
     
     // --- Helpers ---
-    // TODO: When unique identifiers (e.g., URIs or NPO IDs) are created for each cell,
-    // replace labelToIdx / csaLabelToIdx with a mapping keyed by the unique ID instead
-    // of preferredLabel. This will eliminate collisions where different cells share the
-    // same preferredLabel (e.g., "DRG Rxfp1 mouse neuron" exists in both CSA and Krauter).
-    // The csaLabelToIdx workaround below is a temporary fix for that collision.
     const labelToIdx = {};
-    const entityToIdx = {};
-    const csaLabelToIdx = {};
     CELL_TYPES.forEach((ct, idx) => {
         labelToIdx[ct.preferredLabel] = idx;
-        if (ct.entity) entityToIdx[ct.entity] = idx;
-        if (ct.sourceNomenclatureLabel === 'CSA paper') csaLabelToIdx[ct.preferredLabel] = idx;
     });
-    function resolveLabel(lbl) {
-        if (labelToIdx[lbl] !== undefined) return labelToIdx[lbl];
-        if (entityToIdx[lbl] !== undefined) return entityToIdx[lbl];
+    function resolveRef(rel) {
+        if (rel.id && ID_INDEX[rel.id] !== undefined) return ID_INDEX[rel.id];
+        if (rel.label && labelToIdx[rel.label] !== undefined) return labelToIdx[rel.label];
         return null;
     }
-    
+
     function getResolvedConnections(ct) {
         const conns = [];
         if (ct.assertedSubclassOf) {
             ct.assertedSubclassOf.forEach(s => {
-                if (!s.label || s.label === 'added' || s.label.startsWith('-->')) return;
-                const ti = resolveLabel(s.label);
+                if (!s.label && !s.id) return;
+                if (s.label === 'added' || (s.label && s.label.startsWith('-->'))) return;
+                const ti = resolveRef(s);
                 if (ti !== null) conns.push({ targetIdx: ti, type: 'subtype' });
             });
         }
         if (ct.mapsTo) {
             ct.mapsTo.forEach(m => {
-                if (!m.label || m.label === 'added' || m.label.startsWith('-->')) return;
-                const ti = resolveLabel(m.label);
+                if (!m.label && !m.id) return;
+                if (m.label === 'added' || (m.label && m.label.startsWith('-->'))) return;
+                const ti = resolveRef(m);
                 if (ti !== null && !conns.find(c => c.targetIdx === ti))
                     conns.push({ targetIdx: ti, type: 'equiv' });
             });
@@ -1346,9 +1347,10 @@ function renderLineageView() {
     const csaToFamily = {};
     masterFamilies.forEach(fam => {
         csaByFamily[fam.name] = [];
-        fam.children.forEach(childLabel => {
-            // Prefer CSA-specific lookup so non-CSA cells with the same preferredLabel don't clobber
-            const idx = csaLabelToIdx[childLabel] !== undefined ? csaLabelToIdx[childLabel] : labelToIdx[childLabel];
+        fam.children.forEach(child => {
+            const childId = child.id || '';
+            const childLabel = child.label || child;
+            const idx = childId ? ID_INDEX[childId] : labelToIdx[childLabel];
             if (idx !== undefined) {
                 csaByFamily[fam.name].push({ idx, ct: CELL_TYPES[idx] });
                 csaToFamily[idx] = fam.name;
@@ -1969,50 +1971,53 @@ function renderLineageView() {
 
 
 
-function showModal(idx) {
+function buildCellDetailHTML(idx, useLinks) {
     const ct=CELL_TYPES[idx];
-    document.getElementById('modalTitle').textContent=ct.preferredLabel;
     let relatedHtml='';
-    if(ct.relatedCells&&ct.relatedCells.length>0){relatedHtml=`<div class="detail-section"><h3>🔗 Related Species Variants</h3><div class="related-cells">${ct.relatedCells.map(rc=>`<button class="related-cell-btn" onclick="showModalByName('${rc.label.replace(/'/g,"\\'")}')">${rc.label}</button>`).join('')}</div></div>`;}
+    if(ct.relatedCells&&ct.relatedCells.length>0){
+        const relButtons = ct.relatedCells.map(rc => {
+            if (useLinks) {
+                const ri = rc.id ? (ID_INDEX[rc.id] ?? -1) : CELL_TYPES.findIndex(x => x.preferredLabel === rc.label);
+                return ri !== -1 ? `<a href="#cell/${CELL_TYPES[ri].id}" class="related-cell-btn" onclick="event.stopPropagation();">${rc.label}</a>` : `<span class="related-cell-btn">${rc.label}</span>`;
+            }
+            return `<button class="related-cell-btn" onclick="${rc.id ? `openCellById('${rc.id}')` : `showModalByName('${rc.label.replace(/'/g,"\\'")}')`}">${rc.label}</button>`;
+        }).join('');
+        relatedHtml=`<div class="detail-section"><h3>🔗 Related Species Variants</h3><div class="related-cells">${relButtons}</div></div>`;
+    }
     let assertedHtml='';
     const relationships = getAssertedRelationships(idx);
     const hasAnyRelationship = relationships.equivalences.length > 0 || relationships.subtypeOf.length > 0 || relationships.hasSubtypes.length > 0;
-    
+
     if(hasAnyRelationship){
         let innerHtml = '';
-        
-        // Equivalences
         if(relationships.equivalences.length > 0) {
             const equivLinks = relationships.equivalences.map(r => {
                 const arrow = r.direction === 'to' ? '→' : '←';
-                const title = r.direction === 'to' ? 'Consistent with' : 'Consistenet with';
+                const title = r.direction === 'to' ? 'Consistent with' : 'Consistent with';
+                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn equiv-btn" title="${title}">${arrow} ${r.label}</a>`;
                 return `<button class="related-cell-btn equiv-btn" onclick="showModal(${r.idx})" title="${title}">${arrow} ${r.label}</button>`;
             }).join(' ');
             innerHtml += `<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">${equivLinks}</div></div>`;
         }
-        
-        // Subtype of
         if(relationships.subtypeOf.length > 0) {
-            const subtypeLinks = relationships.subtypeOf.map(r => 
-                `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↑ ${r.label}</button>`
-            ).join(' ');
+            const subtypeLinks = relationships.subtypeOf.map(r => {
+                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn">↑ ${r.label}</a>`;
+                return `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↑ ${r.label}</button>`;
+            }).join(' ');
             innerHtml += `<div class="asserted-subtype-section"><div class="asserted-label">Subtype of:</div><div class="related-cells">${subtypeLinks}</div></div>`;
         }
-        
-        // Has subtypes
         if(relationships.hasSubtypes.length > 0) {
-            const hasSubLinks = relationships.hasSubtypes.map(r => 
-                `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↓ ${r.label}</button>`
-            ).join(' ');
+            const hasSubLinks = relationships.hasSubtypes.map(r => {
+                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn">↓ ${r.label}</a>`;
+                return `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↓ ${r.label}</button>`;
+            }).join(' ');
             innerHtml += `<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">${hasSubLinks}</div></div>`;
         }
-        
         assertedHtml=`<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Proposed Relationships</div>${innerHtml}</div>`;
     }
     let mapsToHtml = assertedHtml;
     const sourceLinkHtml=ct.sourceNomenclature?`<div class="detail-section"><h3>📚 Source Publication</h3><a href="${ct.sourceNomenclature}" target="_blank" class="source-link">${getSourceLinkText(ct)} ↗</a></div>`:'';
     const sourceDataHtml = ct.sourceData && ct.sourceData.length > 0 ? `<div class="detail-section"><h3>📊 Source Data</h3>${ct.sourceData.map(sd => `<a href="${sd.uri}" target="_blank" class="source-link">${sd.label} ↗</a>`).join('<br>')}</div>` : '';
-    // PRECISION Atlas — Gene Distribution links for marker genes present in the PRECISION dataset
     let precisionHtml = '';
     if (ct.sourceNomenclatureLabel === 'big DRG paper' && ct.markerGenes && ct.markerGenes.length > 0) {
         const seenGenes = new Set();
@@ -2034,10 +2039,73 @@ function showModal(idx) {
         }
     }
     const notesHtml = (ct.alertNotes && ct.alertNotes.length > 0) || (ct.curatorNotes && ct.curatorNotes.length > 0) ? `<div class="detail-section"><h3>📝 Notes</h3><div style="padding:0.5rem 0.75rem;background:#fef9c3;border:1px solid #eab308;border-radius:6px;font-size:0.9rem;line-height:1.5;">${ct.alertNotes && ct.alertNotes.length > 0 ? `<div style="margin-bottom:${ct.curatorNotes && ct.curatorNotes.length > 0 ? '1rem' : '0'};"><strong style="color:#b45309;">⚠️ Alert Notes:</strong>${ct.alertNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}${ct.curatorNotes && ct.curatorNotes.length > 0 ? `<div><strong style="color:#1e40af;">📋 Curator Notes:</strong>${ct.curatorNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}</div></div>` : '';
-    document.getElementById('modalBody').innerHTML=`<div class="detail-section"><p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
+    return `<div class="detail-section"><p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
+}
+
+function buildRelatedSourceCellsHTML(idx) {
+    const ct = CELL_TYPES[idx];
+    const sourceCells = CELL_TYPES.map((c, i) => ({cell: c, idx: i}))
+        .filter(item => item.idx !== idx && item.cell.sourceNomenclatureLabel === ct.sourceNomenclatureLabel);
+    if (sourceCells.length === 0) return '';
+    return `<div class="detail-section"><h3>📋 Other cells from ${ct.sourceNomenclatureLabel} (${sourceCells.length})</h3><div class="related-source-cells">${sourceCells.map(item => {
+        const c = item.cell;
+        const axonBadge = c.clusterAttributes.fiber_a_beta ? '<span class="card-badge axon">Aβ</span>' : c.clusterAttributes.fiber_a_delta ? '<span class="card-badge axon">Aδ</span>' : c.clusterAttributes.fiber_c ? '<span class="card-badge axon">C</span>' : '';
+        return `<a href="#cell/${c.id}" class="related-source-cell-link"><div class="related-source-cell-name">${c.preferredLabel}</div><div class="related-source-cell-meta"><span class="related-source-cell-species">${c.species}</span>${axonBadge}</div></a>`;
+    }).join('')}</div></div>`;
+}
+
+function renderCellDetailView(idx) {
+    closeModal();
+    const ct = CELL_TYPES[idx];
+    const viewLabel = VIEW_NAMES[currentView] || 'previous view';
+    document.getElementById('cellDetailContent').innerHTML =
+        `<div class="cell-detail-page">` +
+            `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
+            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><h1>${ct.preferredLabel}</h1><span class="cell-detail-source-label" style="color:${ct.sourceColor||'#667eea'};">${ct.sourceNomenclatureLabel||''}</span></div>` +
+            `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
+            buildRelatedSourceCellsHTML(idx) +
+        `</div>`;
+    document.getElementById('cellDetailViewContainer').style.display = 'block';
+    document.getElementById('cellDetailViewContainer').scrollTop = 0;
+    window.scrollTo(0, 0);
+    ['cardViewContainer','treeViewContainer','synthesisViewContainer','clusterViewContainer','lineageViewContainer','compareViewContainer'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+    });
+    document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+}
+
+function handleHashChange() {
+    const hash = location.hash;
+    const match = hash.match(/^#cell\/(.+)$/);
+    if (match) {
+        const cellId = decodeURIComponent(match[1]);
+        const idx = ID_INDEX[cellId] ?? -1;
+        if (idx !== -1) {
+            renderCellDetailView(idx);
+        } else {
+            location.hash = '';
+        }
+    } else {
+        const detailContainer = document.getElementById('cellDetailViewContainer');
+        if (detailContainer && detailContainer.style.display !== 'none') {
+            detailContainer.style.display = 'none';
+            switchView(currentView);
+        }
+    }
+}
+
+function showModal(idx) {
+    const ct=CELL_TYPES[idx];
+    document.getElementById('modalTitle').textContent=ct.preferredLabel;
+    const detailLink = document.getElementById('modalDetailLink');
+    if (detailLink) {
+        detailLink.innerHTML = `<a href="#cell/${ct.id}" class="modal-detail-link">Open full detail</a><button class="modal-newtab-btn" onclick="window.open(location.pathname+location.search+'#cell/${ct.id}','_blank')" title="Open in new tab">↗</button>`;
+    }
+    document.getElementById('modalBody').innerHTML = buildCellDetailHTML(idx, false);
     document.getElementById('modal').classList.add('show');
 }
 function showModalByName(name) { const idx=CELL_TYPES.findIndex(ct=>ct.preferredLabel===name); if(idx!==-1)showModal(idx); }
+function openCellById(id) { const idx=ID_INDEX[id]; if(idx!==undefined)showModal(idx); }
 function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
 // ===== Permalink Utilities =====
@@ -2427,6 +2495,8 @@ function renderCompareView(anchorPreset, comparePreset) {
         anchorSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
         if (anchorPreset && sources.includes(anchorPreset)) {
             anchorSelect.value = anchorPreset;
+        } else if (sources.includes('big DRG paper')) {
+            anchorSelect.value = 'big DRG paper';
         }
         anchorSelect.addEventListener('change', () => {
             // Clear compare selectors and rebuild
@@ -2468,6 +2538,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('modal').addEventListener('click',(e)=>{if(e.target.id==='modal')closeModal();});
     document.getElementById('uploadModal').addEventListener('click',(e)=>{if(e.target.id==='uploadModal')closeUploadModal();});
     document.querySelectorAll('.cluster-controls .attr-btn').forEach(btn=>{btn.addEventListener('click',()=>handleAttrClick(btn));});
+    window.addEventListener('hashchange', handleHashChange);
 
     // Deep-link support: parse URL parameters to set view and filters
     // Example: ?view=cards&source=big+DRG+paper&species=mouse&axon=fiber_c&location=soma_drg&gene=Trpv1&equiv=yes&cell=CLTM1
@@ -2565,14 +2636,23 @@ document.addEventListener('DOMContentLoaded', () => {
             applyCardFilters();
         }
 
-        // Open a specific cell modal by preferred label or atlas annotation
+        // Open a specific cell modal by ID, preferred label, or atlas annotation
         if (cell) {
-            showModalByName(cell);
+            if (ID_INDEX[cell] !== undefined) openCellById(cell);
+            else showModalByName(cell);
         } else if (atlasAnnotation) {
             const cellName = ATLAS_TO_CELL[atlasAnnotation];
             if (cellName) {
                 showModalByName(cellName);
             }
         }
+    } else {
+        // No URL params — show default view (cluster)
+        switchView('cluster');
+    }
+
+    // Handle initial hash (e.g. direct link to #cell/npokb:915)
+    if (location.hash.match(/^#cell\/.+$/)) {
+        handleHashChange();
     }
 });

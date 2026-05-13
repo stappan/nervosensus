@@ -31,12 +31,12 @@
             navigating the multiple, sometimes conflicting, nomenclatures used across different published atlases and
             studies. Nothing shown here represents settled scientific claim.</div>
         <div class="view-buttons">
-            <button class="view-btn active" data-view="cards">📋 Card View</button>
+            <button class="view-btn active" data-view="cluster">🔮 Cluster View</button>
             <button class="view-btn" data-view="tree">🌳 Tree View</button>
-            <button class="view-btn" data-view="synthesis">📊 Synthesis View</button>
-            <button class="view-btn" data-view="cluster">🔮 Cluster View</button>
-            <button class="view-btn" data-view="lineage">🌳 Provisional Mapping</button>
             <button class="view-btn" data-view="compare">🔀 Compare</button>
+            <button class="view-btn" data-view="synthesis">📊 Synthesis View</button>
+            <button class="view-btn" data-view="lineage">🌳 Provisional Mapping</button>
+            <button class="view-btn" data-view="cards">📋 Card View</button>
         </div>
         <div id="cardViewContainer" class="view-container">
             <h2 class="view-header">Card View</h2>
@@ -334,6 +334,9 @@
                 </div>
                 <div id="compareTableWrapper" class="compare-table-wrapper"></div>
             </div>
+        </div>
+        <div id="cellDetailViewContainer" class="view-container" style="display:none;">
+            <div id="cellDetailContent"></div>
         </div>
     </div>
     <div id="permalinkToast" class="permalink-toast" style="display:none;">Link copied to clipboard!</div>

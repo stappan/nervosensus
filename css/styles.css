@@ -407,8 +407,19 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 }
 .view-container {
 	padding: 2rem; 
-	background: white; 
-	border-radius: 12px; 
-	box-shadow: 0 2px 8px rgba(0,0,0,0.1);     
+	background: white;
+	border-radius: 12px;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 	overflow: hidden;
 }
+
+/* Cell Detail View */
+.cell-detail-page { max-width: 900px; margin: 0 auto; padding: 1rem 0; }
+.cell-detail-back { margin-bottom: 1rem; }
+.cell-detail-back a { color: #667eea; text-decoration: none; font-size: 0.95rem; }
+.cell-detail-back a:hover { text-decoration: underline; }
+.cell-detail-header { margin-bottom: 1.5rem; }
+.cell-detail-header h1 { font-size: 1.5rem; color: #2d3748; margin: 0.25rem 0; }
+.cell-detail-source-bar { height: 4px; border-radius: 2px; margin-bottom: 0.5rem; }
+.cell-detail-source-label { font-size: 0.85rem; font-weight: 600; }
+.cell-detail-body { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }

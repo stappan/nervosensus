@@ -73,10 +73,14 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .gene-link { display: inline-block; padding: 0.5rem 1rem; background: #edf2f7; border-radius: 6px; text-decoration: none; color: #2d3748; font-weight: 600; font-size: 0.9rem; }
 .gene-link:hover { background: #667eea; color: white; }
 .close-btn { background: none; border: none; font-size: 1.75rem; cursor: pointer; color: #718096; flex-shrink: 0; line-height: 1; padding: 0; }
+.modal-detail-link { color: #667eea; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-left: 0.75rem; }
+.modal-detail-link:hover { text-decoration: underline; }
+.modal-newtab-btn { background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.85rem; padding: 0 0.25rem; vertical-align: middle; }
+.modal-newtab-btn:hover { color: #4c51bf; }
 .source-link { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
 .source-link:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
 .related-cells { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
-.related-cell-btn { padding: 0.5rem 0.75rem; background: #f0f4ff; border: 1px solid #667eea; border-radius: 20px; color: #667eea; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.related-cell-btn { display: inline-block; padding: 0.5rem 0.75rem; background: #f0f4ff; border: 1px solid #667eea; border-radius: 20px; color: #667eea; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-decoration: none; }
 .related-cell-btn:hover { background: #667eea; color: white; }
 .species-icon { margin-right: 0.25rem; }
 .maps-to-section { margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, #fef3c7, #fde68a); border: 2px solid #f59e0b; border-radius: 10px; }
@@ -423,3 +427,11 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .cell-detail-source-bar { height: 4px; border-radius: 2px; margin-bottom: 0.5rem; }
 .cell-detail-source-label { font-size: 0.85rem; font-weight: 600; }
 .cell-detail-body { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.cell-detail-actions { margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center; }
+.detail-section { margin-top: 1.5rem; }
+.detail-section h3 { color: #2d3748; font-size: 1.1rem; margin-bottom: 0.75rem; }
+.related-source-cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.5rem; }
+.related-source-cell-link { display: block; padding: 0.6rem 0.75rem; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-decoration: none; color: #2d3748; transition: all 0.15s; }
+.related-source-cell-link:hover { background: #edf2f7; border-color: #cbd5e0; }
+.related-source-cell-name { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.2rem; }
+.related-source-cell-meta { font-size: 0.75rem; color: #718096; display: flex; gap: 0.5rem; align-items: center; }

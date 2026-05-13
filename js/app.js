@@ -468,6 +468,7 @@ function applyCardFilters() {
     const geneFilter = document.getElementById('filterGene').value;
     const equivFilter = document.getElementById('filterEquiv').value;
     
+    const SOURCE_ORDER = ['big DRG paper'];
     const filtered = CELL_TYPES.filter((ct, idx) => {
         if (sourceFilter && ct.sourceNomenclatureLabel !== sourceFilter) return false;
         if (speciesFilter && ct.species.toLowerCase() !== speciesFilter.toLowerCase()) return false;
@@ -477,6 +478,13 @@ function applyCardFilters() {
         if (equivFilter === 'yes' && (!ct.mapsTo || ct.mapsTo.length === 0)) return false;
         if (equivFilter === 'no' && ct.mapsTo && ct.mapsTo.length > 0) return false;
         return true;
+    });
+    filtered.sort((a, b) => {
+        const ai = SOURCE_ORDER.indexOf(a.sourceNomenclatureLabel);
+        const bi = SOURCE_ORDER.indexOf(b.sourceNomenclatureLabel);
+        const aPri = ai >= 0 ? ai : SOURCE_ORDER.length;
+        const bPri = bi >= 0 ? bi : SOURCE_ORDER.length;
+        return aPri - bPri;
     });
     
     document.getElementById('cardCount').textContent = filtered.length + ' cells';
@@ -1012,7 +1020,7 @@ function togglePinnedRow(idx) {
 function highlightEquivPair(idx) { highlightRelationships(idx); }
 function clearEquivHighlight() { clearRelationshipHighlights(); }
 
-function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,id:i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
+function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,idx:i,id:i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
 
 function clearAllFilters() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); updateClusterLegend(); updateClusterStats(); updateClusterVisualization(); }
 function updateSelectedDisplay() { const display=document.getElementById('selectedAttrsDisplay'); if(selectedAttributes.length===0){display.textContent='No attributes selected';}else{const labels=selectedAttributes.map(a=>{if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);return gene?gene.display:a;}return ATTR_LABELS[a]||a;});display.textContent=`Selected (${labels.length}): ${labels.join(', ')}`;} }
@@ -2062,6 +2070,7 @@ function renderCellDetailView(idx) {
         `<div class="cell-detail-page">` +
             `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
             `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><h1>${ct.preferredLabel}</h1><span class="cell-detail-source-label" style="color:${ct.sourceColor||'#667eea'};">${ct.sourceNomenclatureLabel||''}</span></div>` +
+            `<div class="cell-detail-actions"><button class="permalink-btn" onclick="copyCellDetailLink()">🔗 Copy Link</button></div>` +
             `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
             buildRelatedSourceCellsHTML(idx) +
         `</div>`;
@@ -2162,6 +2171,11 @@ function copyClusterLink() {
 
 function copyLineageLink() {
     copyPermalink({ view: 'lineage' });
+}
+
+function copyCellDetailLink() {
+    const url = window.location.href.split('?')[0].split('#')[0] + location.hash;
+    navigator.clipboard.writeText(url).then(() => showPermalinkToast());
 }
 
 // ===== Compare View =====

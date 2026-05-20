@@ -2075,7 +2075,7 @@ function renderCellDetailView(idx) {
     document.getElementById('cellDetailContent').innerHTML =
         `<div class="cell-detail-page">` +
             `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
-            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id" style="font-size:0.8rem;">${ct.id||''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${buildSourceLine(ct)}</div>` +
+            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id">${ct.id||''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${buildSourceLine(ct)}</div>` +
             `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
             buildRelatedSourceCellsHTML(idx) +
         `</div>`;

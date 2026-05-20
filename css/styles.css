@@ -433,6 +433,9 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .cell-detail-header h1 { font-size: 1.5rem; color: #2d3748; margin: 0.25rem 0; }
 .cell-detail-source-bar { height: 4px; border-radius: 2px; margin-bottom: 0.5rem; }
 .cell-detail-source-label { font-size: 0.85rem; font-weight: 600; }
+.cell-detail-header .card-npokb-id { font-size: 1rem; }
+.cell-detail-header .card-source-line { font-size: 1rem; }
+.cell-detail-header .npokb-copy-btn { font-size: 0.85rem; }
 .cell-detail-body { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 .cell-detail-actions { margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center; }
 .detail-section { margin-top: 1.5rem; }

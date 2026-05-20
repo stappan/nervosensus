@@ -71,6 +71,8 @@ const ATTR_COLORS = ['#667eea', '#f5576c', '#22c55e', '#f59e0b', '#8b5cf6', '#ec
 function formatGeneExpression(t) { return t ? t.replace(/(\w+)\^(\w+)/g, '$1<sup>$2</sup>') : ''; }
 function formatFiberType(s) { return s ? s.replace(/type Ad/g,'type Aδ').replace(/type Ab/g,'type Aβ').replace(/Ad \(/g,'Aδ (').replace(/Ab \(/g,'Aβ (').replace(/\(delta\)/g,'(δ)').replace(/\(beta\)/g,'(β)') : ''; }
 function getSourceLinkText(ct) { return ct.sourceNomenclatureLabel || 'View Source Publication'; }
+function extractDOI(url) { if (!url) return ''; const m = url.match(/doi\.org\/(.+)$/); return m ? m[1] : url; }
+function buildSourceLine(ct) { const doi = extractDOI(ct.sourceNomenclature); return `<div class="card-source-line"><span class="card-source-name" style="color:${ct.sourceColor||'#667eea'}">${ct.sourceNomenclatureLabel||''}</span>${doi ? `<span class="card-source-sep">·</span><a class="card-source-doi" href="${ct.sourceNomenclature}" target="_blank" rel="noopener" onclick="event.stopPropagation();">${doi}</a>` : ''}</div>`; }
 function linkifyUrls(text) {
     if (!text) return '';
     return text.replace(/(https?:\/\/[^\s<)"',]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">$1</a>');
@@ -505,10 +507,11 @@ function applyCardFilters() {
         
         return `<div class="card-compact" style="border-left-color:${ct.sourceColor||'#667eea'}" data-idx="${idx}">
             <div class="card-compact-header" onclick="toggleCardExpand(${idx})">
-                <div class="card-source-dot" style="background:${ct.sourceColor||'#667eea'}" title="${ct.sourceNomenclatureLabel||''}"></div>
                 <div class="card-compact-info">
+                    <div class="card-npokb-id">${ct.id||''}</div>
                     <div class="card-compact-name">${ct.preferredLabel}</div>
                     <div class="card-compact-meta">${ct.species} • ${(ct.somaLocations||[]).join(', ') || 'Unknown location'}</div>
+                    ${buildSourceLine(ct)}
                 </div>
                 <div class="card-compact-badges">${axonBadge}${equivBadge}${subtypeBadge}</div>
                 <button class="card-expand-btn" id="expand-btn-${idx}">▼</button>
@@ -2024,7 +2027,7 @@ function buildCellDetailHTML(idx, useLinks) {
         assertedHtml=`<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Proposed Relationships</div>${innerHtml}</div>`;
     }
     let mapsToHtml = assertedHtml;
-    const sourceLinkHtml=ct.sourceNomenclature?`<div class="detail-section"><h3>📚 Source Publication</h3><a href="${ct.sourceNomenclature}" target="_blank" class="source-link">${getSourceLinkText(ct)} ↗</a></div>`:'';
+    const sourceLinkHtml='';
     const sourceDataHtml = ct.sourceData && ct.sourceData.length > 0 ? `<div class="detail-section"><h3>📊 Source Data</h3>${ct.sourceData.map(sd => `<a href="${sd.uri}" target="_blank" class="source-link">${sd.label} ↗</a>`).join('<br>')}</div>` : '';
     let precisionHtml = '';
     if (ct.sourceNomenclatureLabel === 'big DRG paper' && ct.markerGenes && ct.markerGenes.length > 0) {
@@ -2055,10 +2058,13 @@ function buildRelatedSourceCellsHTML(idx) {
     const sourceCells = CELL_TYPES.map((c, i) => ({cell: c, idx: i}))
         .filter(item => item.idx !== idx && item.cell.sourceNomenclatureLabel === ct.sourceNomenclatureLabel);
     if (sourceCells.length === 0) return '';
-    return `<div class="detail-section"><h3>📋 Other cells from ${ct.sourceNomenclatureLabel} (${sourceCells.length})</h3><div class="related-source-cells">${sourceCells.map(item => {
+    return `<div class="detail-section"><h3>📋 Other cells from ${ct.sourceNomenclatureLabel} (${sourceCells.length})</h3><div class="related-source-cards-grid">${sourceCells.map(item => {
         const c = item.cell;
         const axonBadge = c.clusterAttributes.fiber_a_beta ? '<span class="card-badge axon">Aβ</span>' : c.clusterAttributes.fiber_a_delta ? '<span class="card-badge axon">Aδ</span>' : c.clusterAttributes.fiber_c ? '<span class="card-badge axon">C</span>' : '';
-        return `<a href="#cell/${c.id}" class="related-source-cell-link"><div class="related-source-cell-name">${c.preferredLabel}</div><div class="related-source-cell-meta"><span class="related-source-cell-species">${c.species}</span>${axonBadge}</div></a>`;
+        const rels = getAssertedRelationships(item.idx);
+        const hasAnyRel = rels.equivalences.length > 0 || rels.subtypeOf.length > 0 || rels.hasSubtypes.length > 0;
+        const equivBadge = hasAnyRel ? '<span class="card-badge equiv" title="Has proposed relationships">≡</span>' : '';
+        return `<a href="#cell/${c.id}" class="card-compact card-compact-link" style="border-left-color:${c.sourceColor||'#667eea'};text-decoration:none;color:inherit;display:block;margin-bottom:0;"><div class="card-compact-header" style="cursor:pointer;"><div class="card-compact-info"><div class="card-npokb-id">${c.id||''}</div><div class="card-compact-name">${c.preferredLabel}</div><div class="card-compact-meta">${c.species} · ${(c.somaLocations||[]).join(', ') || 'Unknown location'}</div></div><div class="card-compact-badges">${axonBadge}${equivBadge}</div></div></a>`;
     }).join('')}</div></div>`;
 }
 
@@ -2069,8 +2075,7 @@ function renderCellDetailView(idx) {
     document.getElementById('cellDetailContent').innerHTML =
         `<div class="cell-detail-page">` +
             `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
-            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><h1>${ct.preferredLabel}</h1><span class="cell-detail-source-label" style="color:${ct.sourceColor||'#667eea'};">${ct.sourceNomenclatureLabel||''}</span></div>` +
-            `<div class="cell-detail-actions"><button class="permalink-btn" onclick="copyCellDetailLink()">🔗 Copy Link</button></div>` +
+            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id" style="font-size:0.8rem;">${ct.id||''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${buildSourceLine(ct)}</div>` +
             `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
             buildRelatedSourceCellsHTML(idx) +
         `</div>`;

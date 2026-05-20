@@ -42,7 +42,14 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .card-compact:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
 .card-compact-header { padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
 .card-compact-header:hover { background: #f8fafc; }
-.card-source-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.card-npokb-id { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 0.7rem; font-weight: 600; color: #718096; letter-spacing: 0.03em; margin-bottom: 1px; }
+.card-source-line { font-size: 0.75rem; margin-top: 3px; color: #718096; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-source-name { font-weight: 600; }
+.card-source-doi { color: #718096; text-decoration: none; }
+.card-source-doi:hover { text-decoration: underline; color: #4a5568; }
+.card-source-sep { margin: 0 0.3em; color: #cbd5e0; }
+.npokb-copy-btn { background: none; border: none; cursor: pointer; font-size: 0.7rem; padding: 0.1rem 0.3rem; margin-left: 0.4rem; opacity: 0.4; transition: opacity 0.15s; vertical-align: middle; border-radius: 3px; }
+.npokb-copy-btn:hover { opacity: 1; background: #edf2f7; }
 .card-compact-info { flex: 1; min-width: 0; }
 .card-compact-name { font-weight: 700; color: #2d3748; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-compact-meta { font-size: 0.8rem; color: #718096; margin-top: 0.2rem; }
@@ -418,7 +425,7 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 }
 
 /* Cell Detail View */
-.cell-detail-page { max-width: 900px; margin: 0 auto; padding: 1rem 0; }
+.cell-detail-page { max-width: 1200px; margin: 0 auto; padding: 1rem 0; }
 .cell-detail-back { margin-bottom: 1rem; }
 .cell-detail-back a { color: #667eea; text-decoration: none; font-size: 0.95rem; }
 .cell-detail-back a:hover { text-decoration: underline; }
@@ -430,8 +437,6 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .cell-detail-actions { margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center; }
 .detail-section { margin-top: 1.5rem; }
 .detail-section h3 { color: #2d3748; font-size: 1.1rem; margin-bottom: 0.75rem; }
-.related-source-cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.5rem; }
-.related-source-cell-link { display: block; padding: 0.6rem 0.75rem; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-decoration: none; color: #2d3748; transition: all 0.15s; }
-.related-source-cell-link:hover { background: #edf2f7; border-color: #cbd5e0; }
-.related-source-cell-name { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.2rem; }
-.related-source-cell-meta { font-size: 0.75rem; color: #718096; display: flex; gap: 0.5rem; align-items: center; }
+.related-source-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
+.card-compact-link { text-decoration: none; color: inherit; display: block; }
+.card-compact-link:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }

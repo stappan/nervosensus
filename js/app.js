@@ -431,9 +431,9 @@ function initGeneButtons() {
 }
 
 function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); ID_INDEX=buildIdIndex(); closeUploadModal(); selectedAttributes=[]; renderCards(); }
-const VIEW_NAMES = { cards: 'Card View', tree: 'Tree View', synthesis: 'Synthesis View', cluster: 'Cluster View', lineage: 'Provisional Mapping', compare: 'Compare' };
+const VIEW_NAMES = { cards: 'Card View', tree: 'Tree View', synthesis: 'Synthesis View', cluster: 'Cluster View', lineage: 'Provisional Mapping', compare: 'Compare', align: 'Align View', concordance: 'Concordance' };
 function openFeedback() { const name = VIEW_NAMES[currentView] || currentView; window.open('nervosensus-feedback.html?view=' + encodeURIComponent(name), '_blank'); }
-function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cellDetailViewContainer').style.display='none'; document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); if(location.hash.startsWith('#cell/'))history.replaceState(null,'',location.pathname+location.search); }
+function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cellDetailViewContainer').style.display='none'; document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; document.getElementById('alignViewContainer').style.display=view==='align'?'block':'none'; document.getElementById('concordanceViewContainer').style.display=view==='concordance'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); if(view==='align')renderAlignView(); if(view==='concordance')renderConcordanceView(); if(location.hash.startsWith('#cell/'))history.replaceState(null,'',location.pathname+location.search); }
 
 
 function setTreeGrouping(grouping) {
@@ -957,6 +957,583 @@ function clearRelationshipHighlights() {
     document.querySelectorAll('.synthesis-table tr.equiv-highlight, .synthesis-table tr.subtype-highlight, .synthesis-table tr.hover-source').forEach(row => {
         row.classList.remove('equiv-highlight', 'subtype-highlight', 'hover-source');
     });
+}
+
+// ── Align View ──────────────────────────────────────────────────────────
+let alignExpandedState = {};
+
+function getAlignTemperature(ct) {
+    if (!ct.clusterAttributes) return '';
+    const cold = ct.clusterAttributes.cold_sensitive;
+    const heat = ct.clusterAttributes.heat_sensitive;
+    if (cold && heat) return 'Cold, Heat';
+    if (cold) return 'Cold';
+    if (heat) return 'Heat';
+    return '';
+}
+
+function getMarkerGeneNames(ct) {
+    if (!ct.markerGenes || ct.markerGenes.length === 0) return '';
+    return ct.markerGenes.map(g => g.name || '').filter(Boolean).join(', ');
+}
+
+function renderAlignView() {
+    const table = document.getElementById('alignTable');
+    const countEl = document.getElementById('alignCount');
+
+    // Columns for the align table
+    const columns = [
+        { key: 'expand', label: '', type: 'expand' },
+        { key: 'view', label: '', type: 'view' },
+        { key: 'name', label: 'Cell Type', type: 'name' },
+        { key: 'source', label: 'Source', type: 'source' },
+        { key: 'markerGenes', label: 'Marker Genes', type: 'genes' },
+        { key: 'fiber_a_beta', label: 'Aβ', type: 'bool' },
+        { key: 'fiber_a_delta', label: 'Aδ', type: 'bool' },
+        { key: 'fiber_c', label: 'C', type: 'bool' },
+        { key: 'mechanosensitive_ltm', label: 'LTM', type: 'bool' },
+        { key: 'mechanosensitive_htm', label: 'HTM', type: 'bool' },
+        { key: 'temperature', label: 'Temp', type: 'temperature' },
+        { key: 'proprioceptive', label: 'Proprio', type: 'bool' },
+        { key: 'rapidly_adapting', label: 'RA', type: 'bool' },
+        { key: 'slowly_adapting', label: 'SA', type: 'bool' },
+        { key: 'species', label: 'Species', type: 'text' },
+    ];
+
+    // Find Big DRG paper cells
+    const bigDrgCells = [];
+    CELL_TYPES.forEach((ct, idx) => {
+        if (ct.sourceNomenclatureLabel === 'big DRG paper') {
+            bigDrgCells.push({ ...ct, origIdx: idx });
+        }
+    });
+
+    // For each Big DRG cell, find all related cells from other sources
+    const parentRows = [];
+    const usedChildIdxs = new Set();
+
+    bigDrgCells.forEach(parentCt => {
+        const rels = getAssertedRelationships(parentCt.origIdx);
+        const children = [];
+        const allRelated = [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes];
+        allRelated.forEach(r => {
+            if (r.idx !== parentCt.origIdx && CELL_TYPES[r.idx].sourceNomenclatureLabel !== 'big DRG paper') {
+                if (!children.find(c => c.origIdx === r.idx)) {
+                    children.push({ ...CELL_TYPES[r.idx], origIdx: r.idx });
+                    usedChildIdxs.add(r.idx);
+                }
+            }
+        });
+        // Sort children by source so cells from the same publication are grouped together
+        children.sort((a, b) => (a.sourceNomenclatureLabel || '').localeCompare(b.sourceNomenclatureLabel || ''));
+        parentRows.push({ parent: parentCt, children });
+    });
+
+    // Sort: parents with children first, then parents without children at bottom
+    const withChildren = parentRows.filter(r => r.children.length > 0);
+    const withoutChildren = parentRows.filter(r => r.children.length === 0);
+    withChildren.sort((a, b) => a.parent.preferredLabel.localeCompare(b.parent.preferredLabel));
+    withoutChildren.sort((a, b) => a.parent.preferredLabel.localeCompare(b.parent.preferredLabel));
+    const sortedRows = [...withChildren, ...withoutChildren];
+
+    const totalRelated = sortedRows.reduce((sum, r) => sum + r.children.length, 0);
+    if (countEl) countEl.textContent = bigDrgCells.length + ' Big DRG cells · ' + totalRelated + ' related cells';
+
+    // Build header
+    let html = '<thead><tr>';
+    columns.forEach(col => {
+        const cls = col.type === 'name' ? ' class="align-cell-name"' : col.type === 'genes' ? ' class="align-genes-col"' : '';
+        html += '<th' + cls + '>' + col.label + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    // Section header for cells with alignments
+    if (withChildren.length > 0) {
+        html += '<tr class="align-section-header"><td colspan="' + columns.length + '">Cells with cross-source alignments (' + withChildren.length + ')</td></tr>';
+    }
+
+    // Render rows
+    sortedRows.forEach((row, rowIdx) => {
+        const ct = row.parent;
+        const hasChildren = row.children.length > 0;
+        const isExpanded = alignExpandedState[ct.origIdx] === true;
+
+        // Insert section header before "no alignments" group
+        if (rowIdx === withChildren.length && withoutChildren.length > 0) {
+            html += '<tr class="align-section-header"><td colspan="' + columns.length + '">Cells without cross-source alignments (' + withoutChildren.length + ')</td></tr>';
+        }
+
+        // Parent row
+        html += '<tr class="align-parent-row' + (isExpanded ? ' expanded' : '') + '" data-idx="' + ct.origIdx + '">';
+        columns.forEach(col => {
+            if (col.type === 'expand') {
+                if (hasChildren) {
+                    html += '<td class="align-expand-cell" onclick="toggleAlignRow(' + ct.origIdx + ')"><span class="align-expand-icon' + (isExpanded ? ' expanded' : '') + '">▶</span></td>';
+                } else {
+                    html += '<td class="align-expand-cell"></td>';
+                }
+            } else if (col.type === 'view') {
+                html += '<td class="view-cell" onclick="showModal(' + ct.origIdx + ')" title="View details"><span class="view-icon">👁</span></td>';
+            } else if (col.type === 'name') {
+                html += '<td class="align-cell-name align-parent-name" title="' + ct.preferredLabel + '">' + (ct.localLabel || ct.preferredLabel) + (hasChildren ? ' <span class="align-child-count">(' + row.children.length + ')</span>' : '') + '</td>';
+            } else if (col.type === 'source') {
+                html += '<td class="align-source"><span style="color:' + (ct.sourceColor || '#f59e0b') + '">' + (ct.sourceNomenclatureLabel || '') + '</span></td>';
+            } else if (col.type === 'genes') {
+                html += '<td class="align-genes">' + getMarkerGeneNames(ct) + '</td>';
+            } else if (col.type === 'bool') {
+                const val = ct.clusterAttributes && ct.clusterAttributes[col.key];
+                html += '<td>' + (val ? '<span class="check-mark">✓</span>' : '<span class="dash-mark">—</span>') + '</td>';
+            } else if (col.type === 'temperature') {
+                const temp = getAlignTemperature(ct);
+                html += '<td class="align-temp">' + (temp || '<span class="dash-mark">—</span>') + '</td>';
+            } else if (col.type === 'text') {
+                html += '<td>' + (ct[col.key] || '—') + '</td>';
+            }
+        });
+        html += '</tr>';
+
+        // Child rows (shown/hidden based on expand state)
+        if (hasChildren) {
+            row.children.forEach(child => {
+                html += '<tr class="align-child-row" data-parent="' + ct.origIdx + '" style="display:' + (isExpanded ? 'table-row' : 'none') + ';">';
+                columns.forEach(col => {
+                    if (col.type === 'expand') {
+                        html += '<td></td>';
+                    } else if (col.type === 'view') {
+                        html += '<td class="view-cell" onclick="showModal(' + child.origIdx + ')" title="View details"><span class="view-icon">👁</span></td>';
+                    } else if (col.type === 'name') {
+                        html += '<td class="align-cell-name" title="' + child.preferredLabel + '">' + (child.localLabel || child.preferredLabel) + '</td>';
+                    } else if (col.type === 'source') {
+                        html += '<td class="align-source"><span style="color:' + (child.sourceColor || '#667eea') + '">' + (child.sourceNomenclatureLabel || '') + '</span></td>';
+                    } else if (col.type === 'genes') {
+                        html += '<td class="align-genes">' + getMarkerGeneNames(child) + '</td>';
+                    } else if (col.type === 'bool') {
+                        const val = child.clusterAttributes && child.clusterAttributes[col.key];
+                        html += '<td>' + (val ? '<span class="check-mark">✓</span>' : '<span class="dash-mark">—</span>') + '</td>';
+                    } else if (col.type === 'temperature') {
+                        const temp = getAlignTemperature(child);
+                        html += '<td class="align-temp">' + (temp || '<span class="dash-mark">—</span>') + '</td>';
+                    } else if (col.type === 'text') {
+                        html += '<td>' + (child[col.key] || '—') + '</td>';
+                    }
+                });
+                html += '</tr>';
+            });
+        }
+    });
+
+    html += '</tbody>';
+    table.innerHTML = html;
+}
+
+function toggleAlignRow(parentIdx) {
+    alignExpandedState[parentIdx] = !alignExpandedState[parentIdx];
+    const isExpanded = alignExpandedState[parentIdx];
+
+    // Toggle expand icon
+    const parentRow = document.querySelector('.align-table tr[data-idx="' + parentIdx + '"]');
+    if (parentRow) {
+        parentRow.classList.toggle('expanded', isExpanded);
+        const icon = parentRow.querySelector('.align-expand-icon');
+        if (icon) icon.classList.toggle('expanded', isExpanded);
+    }
+
+    // Toggle child rows
+    document.querySelectorAll('.align-table tr[data-parent="' + parentIdx + '"]').forEach(row => {
+        row.style.display = isExpanded ? 'table-row' : 'none';
+    });
+}
+
+function toggleAlignAll() {
+    const btn = document.getElementById('alignExpandAll');
+    const anyExpanded = Object.values(alignExpandedState).some(v => v);
+    const newState = !anyExpanded;
+
+    // Get all parent indices that have children
+    document.querySelectorAll('.align-table .align-expand-icon').forEach(icon => {
+        const parentRow = icon.closest('tr');
+        if (parentRow) {
+            const idx = parseInt(parentRow.dataset.idx);
+            alignExpandedState[idx] = newState;
+            parentRow.classList.toggle('expanded', newState);
+            icon.classList.toggle('expanded', newState);
+        }
+    });
+
+    document.querySelectorAll('.align-table .align-child-row').forEach(row => {
+        row.style.display = newState ? 'table-row' : 'none';
+    });
+
+    btn.textContent = newState ? 'Collapse All' : 'Expand All';
+}
+
+// ── Concordance View ────────────────────────────────────────────────
+let concordanceInitialized = false;
+
+const CONCORDANCE_SOURCE_SHORT = {
+    'big DRG paper': 'Big DRG',
+    'CSA paper': 'CSA',
+    'Krauter et al., 2025': 'Krauter 2025',
+    'Qi et al., 2024': 'Qi 2024',
+    'Yu et al., 2024': 'Yu 2024',
+    'Tavares-Ferreira et al., 2022': 'Tavares-F. 2022',
+    'Kupari et al., 2021': 'Kupari 2021',
+};
+
+function getConcordanceSources() {
+    const seen = new Set();
+    const sources = [];
+    CELL_TYPES.forEach(ct => {
+        const s = ct.sourceNomenclatureLabel;
+        if (s && !seen.has(s)) { seen.add(s); sources.push(s); }
+    });
+    return sources;
+}
+
+function getConcordanceSelections() {
+    const anchor = document.getElementById('concordanceAnchorSelect').value;
+    const container = document.getElementById('concordanceSelectorsRow');
+    const selects = container.querySelectorAll('select');
+    const compareSources = [...selects].map(s => s.value).filter(Boolean);
+    return { anchor, compareSources };
+}
+
+function renderConcordanceView(anchorPreset, comparePreset) {
+    const anchorSelect = document.getElementById('concordanceAnchorSelect');
+    const allSources = getConcordanceSources();
+
+    if (!concordanceInitialized) {
+        anchorSelect.innerHTML = allSources.map(s =>
+            '<option value="' + s + '">' + s + '</option>'
+        ).join('');
+        if (anchorPreset && allSources.includes(anchorPreset)) {
+            anchorSelect.value = anchorPreset;
+        } else if (allSources.includes('big DRG paper')) {
+            anchorSelect.value = 'big DRG paper';
+        }
+
+        anchorSelect.addEventListener('change', () => {
+            document.getElementById('concordanceSelectorsRow').innerHTML = '';
+            updateConcordanceTable();
+        });
+
+        document.getElementById('concordanceAddBtn').addEventListener('click', () => addConcordanceSource());
+
+        concordanceInitialized = true;
+    }
+
+    // Apply presets from URL
+    if (anchorPreset && allSources.includes(anchorPreset)) {
+        anchorSelect.value = anchorPreset;
+    }
+
+    // Build compare selectors from URL presets only (otherwise start empty)
+    document.getElementById('concordanceSelectorsRow').innerHTML = '';
+    if (comparePreset && comparePreset.length > 0) {
+        for (const cs of comparePreset) {
+            if (allSources.includes(cs) && cs !== anchorSelect.value) {
+                addConcordanceSource(cs);
+            }
+        }
+    }
+
+    updateConcordanceTable();
+}
+
+function addConcordanceSource(preselect) {
+    const container = document.getElementById('concordanceSelectorsRow');
+    const anchor = document.getElementById('concordanceAnchorSelect').value;
+    const existingSelects = container.querySelectorAll('select');
+    const usedSources = new Set([anchor, ...[...existingSelects].map(s => s.value).filter(Boolean)]);
+    const available = getConcordanceSources().filter(s => !usedSources.has(s));
+    if (!available.length) return;
+
+    const wrapper = document.createElement('span');
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '0.2rem';
+
+    const select = document.createElement('select');
+    select.innerHTML = '<option value="">Select source...</option>' + available.map(s =>
+        '<option value="' + s + '"' + (preselect === s ? ' selected' : '') + '>' + s + '</option>'
+    ).join('');
+    select.addEventListener('change', updateConcordanceTable);
+    select.style.cssText = 'padding:0.4rem 0.75rem;border-radius:6px;border:1px solid #cbd5e0;font-size:0.85rem;background:white;';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'compare-remove-btn';
+    removeBtn.textContent = '✕';
+    removeBtn.onclick = () => { wrapper.remove(); updateConcordanceTable(); };
+
+    wrapper.appendChild(select);
+    wrapper.appendChild(removeBtn);
+    container.appendChild(wrapper);
+
+    if (preselect) updateConcordanceTable();
+}
+
+function updateConcordanceTable() {
+    const table = document.getElementById('concordanceTable');
+    const countEl = document.getElementById('concordanceCount');
+    const { anchor: anchorSource, compareSources } = getConcordanceSelections();
+
+    // Source colors
+    const sourceColorMap = {};
+    CELL_TYPES.forEach(ct => {
+        if (ct.sourceNomenclatureLabel && ct.sourceColor)
+            sourceColorMap[ct.sourceNomenclatureLabel] = ct.sourceColor;
+    });
+
+    // The display columns: anchor first, then selected compare sources
+    const displaySources = [anchorSource, ...compareSources];
+
+    // Update Add button visibility
+    const allSources = getConcordanceSources();
+    const usedSources = new Set(displaySources);
+    const available = allSources.filter(s => !usedSources.has(s));
+    document.getElementById('concordanceAddBtn').style.display = available.length > 0 ? 'inline-block' : 'none';
+
+    // Build rows anchored by anchor source cells
+    const anchorCells = [];
+    CELL_TYPES.forEach((ct, idx) => {
+        if (ct.sourceNomenclatureLabel === anchorSource)
+            anchorCells.push({ ct, idx });
+    });
+
+    const rows = [];
+    anchorCells.forEach(({ ct: parentCt, idx: parentIdx }) => {
+        const rels = getAssertedRelationships(parentIdx);
+        const allRelated = [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes];
+        const bySource = {};
+        displaySources.forEach(s => { bySource[s] = []; });
+        bySource[anchorSource].push({ label: parentCt.localLabel || parentCt.preferredLabel, idx: parentIdx });
+        allRelated.forEach(r => {
+            if (r.idx === parentIdx) return;
+            const rCt = CELL_TYPES[r.idx];
+            const src = rCt.sourceNomenclatureLabel;
+            if (bySource[src] !== undefined && !bySource[src].find(e => e.idx === r.idx)) {
+                bySource[src].push({ label: rCt.localLabel || rCt.preferredLabel, idx: r.idx });
+            }
+        });
+        rows.push({ parentIdx, parentLabel: parentCt.localLabel || parentCt.preferredLabel, bySource });
+    });
+
+    rows.sort((a, b) => a.parentLabel.localeCompare(b.parentLabel));
+
+    // Count
+    let totalMapped = 0;
+    rows.forEach(r => {
+        displaySources.forEach(s => { totalMapped += r.bySource[s].length; });
+    });
+    const anchorShort = CONCORDANCE_SOURCE_SHORT[anchorSource] || anchorSource;
+    if (countEl) countEl.textContent = anchorCells.length + ' ' + anchorShort + ' cells · ' + totalMapped + ' total entries';
+
+    // Build table
+    let html = '<thead><tr><th class="conc-row-num">#</th>';
+    displaySources.forEach(src => {
+        const color = sourceColorMap[src] || '#667eea';
+        const shortName = CONCORDANCE_SOURCE_SHORT[src] || src;
+        html += '<th class="conc-source-col" style="border-bottom:3px solid ' + color + ';">' + shortName + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    rows.forEach((row, rowIdx) => {
+        html += '<tr>';
+        html += '<td class="conc-row-num">' + (rowIdx + 1) + '</td>';
+        displaySources.forEach(src => {
+            const entries = row.bySource[src];
+            if (!entries || entries.length === 0) {
+                html += '<td class="conc-empty"></td>';
+            } else {
+                const isAnchor = src === anchorSource;
+                const cellHtml = entries.map(e =>
+                    '<span class="conc-label' + (isAnchor ? ' conc-anchor' : '') + '" onclick="showModal(' + e.idx + ')" title="' + CELL_TYPES[e.idx].preferredLabel + '">' + e.label + '</span>'
+                ).join('<br>');
+                html += '<td class="conc-cell">' + cellHtml + '</td>';
+            }
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody>';
+    table.innerHTML = html;
+}
+
+function copyConcordanceLink() {
+    const { anchor, compareSources } = getConcordanceSelections();
+    const p = { view: 'concordance', anchor };
+    if (compareSources.length > 0) p.compare = compareSources.join('|');
+    copyPermalink(p);
+}
+
+async function exportConcordanceDocx() {
+    if (typeof docx === 'undefined') {
+        alert('Document export library not loaded. Please check your internet connection and reload the page.');
+        return;
+    }
+    const { anchor: anchorSource, compareSources } = getConcordanceSelections();
+    if (!compareSources.length) {
+        alert('Please add at least one compare source before exporting.');
+        return;
+    }
+    try {
+        const displaySources = [anchorSource, ...compareSources];
+
+        // Derive source colors from data (strip # prefix for docx hex)
+        const sourceColorMap = {};
+        CELL_TYPES.forEach(ct => {
+            if (ct.sourceNomenclatureLabel && ct.sourceColor)
+                sourceColorMap[ct.sourceNomenclatureLabel] = ct.sourceColor.replace('#', '');
+        });
+
+        // Build concordance data (same logic as updateConcordanceTable)
+        const anchorCells = [];
+        CELL_TYPES.forEach((ct, idx) => {
+            if (ct.sourceNomenclatureLabel === anchorSource) anchorCells.push({ ct, idx });
+        });
+        const rows = [];
+        anchorCells.forEach(({ ct: parentCt, idx: parentIdx }) => {
+            const rels = getAssertedRelationships(parentIdx);
+            const allRelated = [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes];
+            const bySource = {};
+            displaySources.forEach(s => { bySource[s] = []; });
+            bySource[anchorSource].push({ label: parentCt.localLabel || parentCt.preferredLabel });
+            allRelated.forEach(r => {
+                if (r.idx === parentIdx) return;
+                const rCt = CELL_TYPES[r.idx];
+                const src = rCt.sourceNomenclatureLabel;
+                if (bySource[src] !== undefined && !bySource[src].find(e => e.idx === r.idx)) {
+                    bySource[src].push({ label: rCt.localLabel || rCt.preferredLabel, idx: r.idx });
+                }
+            });
+            rows.push({ parentLabel: parentCt.localLabel || parentCt.preferredLabel, bySource });
+        });
+        rows.sort((a, b) => a.parentLabel.localeCompare(b.parentLabel));
+
+        const D = docx;
+        const colWidth = Math.floor(95 / displaySources.length);
+
+        // Header row
+        const headerCells = [
+            new D.TableCell({
+                children: [new D.Paragraph({
+                    alignment: D.AlignmentType.CENTER,
+                    spacing: { before: 20, after: 20 },
+                    children: [new D.TextRun({ text: '#', bold: true, size: 14, color: 'a0aec0', font: 'Arial' })]
+                })],
+                shading: { fill: 'f8fafc', type: D.ShadingType.CLEAR, color: 'auto' },
+                width: { size: 5, type: D.WidthType.PERCENTAGE }
+            })
+        ];
+        displaySources.forEach(src => {
+            const shortName = CONCORDANCE_SOURCE_SHORT[src] || src;
+            const color = sourceColorMap[src] || '667eea';
+            headerCells.push(new D.TableCell({
+                children: [new D.Paragraph({
+                    alignment: D.AlignmentType.CENTER,
+                    spacing: { before: 20, after: 20 },
+                    children: [new D.TextRun({ text: shortName, bold: true, size: 16, color: 'FFFFFF', font: 'Arial' })]
+                })],
+                shading: { fill: color, type: D.ShadingType.CLEAR, color: 'auto' },
+                width: { size: colWidth, type: D.WidthType.PERCENTAGE }
+            }));
+        });
+        const headerRow = new D.TableRow({ children: headerCells, tableHeader: true });
+
+        // Data rows
+        const dataRows = rows.map((row, rowIdx) => {
+            const cells = [
+                new D.TableCell({
+                    children: [new D.Paragraph({
+                        alignment: D.AlignmentType.CENTER,
+                        spacing: { before: 20, after: 20 },
+                        children: [new D.TextRun({ text: String(rowIdx + 1), size: 14, color: 'a0aec0', font: 'Arial' })]
+                    })],
+                    width: { size: 5, type: D.WidthType.PERCENTAGE }
+                })
+            ];
+            displaySources.forEach(src => {
+                const entries = row.bySource[src] || [];
+                if (!entries.length) {
+                    cells.push(new D.TableCell({
+                        children: [new D.Paragraph({ children: [] })],
+                        shading: { fill: 'fafbfc', type: D.ShadingType.CLEAR, color: 'auto' },
+                        width: { size: colWidth, type: D.WidthType.PERCENTAGE }
+                    }));
+                } else {
+                    const isAnchor = src === anchorSource;
+                    const paragraphs = entries.map(e => new D.Paragraph({
+                        spacing: { before: 20, after: 20 },
+                        children: [new D.TextRun({
+                            text: e.label,
+                            bold: isAnchor,
+                            size: 16,
+                            color: isAnchor ? '1a202c' : '2d3748',
+                            font: 'Arial'
+                        })]
+                    }));
+                    cells.push(new D.TableCell({
+                        children: paragraphs,
+                        width: { size: colWidth, type: D.WidthType.PERCENTAGE }
+                    }));
+                }
+            });
+            return new D.TableRow({ children: cells });
+        });
+
+        const table = new D.Table({
+            rows: [headerRow, ...dataRows],
+            width: { size: 100, type: D.WidthType.PERCENTAGE }
+        });
+
+        const doc = new D.Document({
+            sections: [{
+                properties: {
+                    page: {
+                        size: { width: 16838, height: 11906, orientation: D.PageOrientation.LANDSCAPE },
+                        margin: { top: 850, bottom: 850, left: 850, right: 850 }
+                    }
+                },
+                children: [
+                    new D.Paragraph({
+                        spacing: { after: 100 },
+                        children: [new D.TextRun({ text: 'NervoSensus — Cross-Source Concordance', bold: true, size: 32, color: '2d3748', font: 'Arial' })]
+                    }),
+                    new D.Paragraph({
+                        spacing: { after: 200 },
+                        children: [
+                            new D.TextRun({ text: 'Anchor: ' + anchorSource + ' (' + anchorCells.length + ' cell types). ', size: 18, color: '718096', font: 'Arial' }),
+                            new D.TextRun({ text: 'Columns show the local label (ilxtr:localLabel) each source uses for its corresponding cell type.', size: 18, color: '718096', font: 'Arial' })
+                        ]
+                    }),
+                    table,
+                    new D.Paragraph({ children: [] }),
+                    new D.Paragraph({
+                        children: [
+                            new D.TextRun({ text: 'Submit feedback at: ', size: 18, color: '718096', font: 'Arial' }),
+                            new D.ExternalHyperlink({
+                                children: [new D.TextRun({ text: 'nervosensus-feedback.html', style: 'Hyperlink', size: 18, color: '667eea', font: 'Arial' })],
+                                link: 'https://stappan.github.io/nervosensus/nervosensus-feedback.html?view=Concordance'
+                            })
+                        ]
+                    })
+                ]
+            }]
+        });
+
+        const blob = await D.Packer.toBlob(doc);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'NervoSensus_Concordance.docx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Concordance export error:', err);
+        alert('Export failed: ' + err.message);
+    }
 }
 
 function togglePinnedRow(idx) {
@@ -2178,6 +2755,10 @@ function copyLineageLink() {
     copyPermalink({ view: 'lineage' });
 }
 
+function copyAlignLink() {
+    copyPermalink({ view: 'align' });
+}
+
 function copyCellDetailLink() {
     const url = window.location.href.split('?')[0].split('#')[0] + location.hash;
     navigator.clipboard.writeText(url).then(() => showPermalinkToast());
@@ -2574,13 +3155,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const atlasAnnotation = params.get('atlasannotation');
 
         // Switch view if specified (default to cards)
-        if (view && ['cards','tree','synthesis','cluster','lineage','compare'].includes(view)) {
+        if (view && ['cards','tree','synthesis','cluster','lineage','compare','align','concordance'].includes(view)) {
             if (view === 'compare') {
                 const anchor = params.get('anchor');
                 const compareParam = params.get('compare');
                 const compareSources = compareParam ? compareParam.split('|').map(s => s.trim()) : [];
                 switchView('compare');
                 renderCompareView(anchor, compareSources);
+            } else if (view === 'concordance') {
+                const anchor = params.get('anchor');
+                const compareParam = params.get('compare');
+                const compareSources = compareParam ? compareParam.split('|').map(s => s.trim()) : [];
+                switchView('concordance');
+                renderConcordanceView(anchor, compareSources);
             } else {
                 switchView(view);
             }

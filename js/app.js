@@ -2808,6 +2808,167 @@ function copyAlignLink() {
     copyPermalink({ view: 'align' });
 }
 
+async function exportSourceReviewXlsx() {
+    if (typeof ExcelJS === 'undefined') {
+        alert('Excel export library not loaded. Please check your internet connection and reload the page.');
+        return;
+    }
+    try {
+        const wb = new ExcelJS.Workbook();
+        const doiMap = getSourceDOIMap();
+
+        const COLUMNS = [
+            { header: 'Status', width: 16, key: 'status' },
+            { header: 'Comments', width: 30, key: 'comments' },
+            { header: 'Local Label', width: 25, key: 'localLabel' },
+            { header: 'Species', width: 10, key: 'species' },
+            { header: 'Marker Genes', width: 45, key: 'genes' },
+            { header: 'Fiber Type', width: 32, key: 'fiberType' },
+            { header: 'Functional Phenotype', width: 32, key: 'functional' },
+            { header: 'Threshold Phenotype', width: 30, key: 'threshold' },
+            { header: 'Adaptation', width: 28, key: 'adaptation' },
+            { header: 'Cre Line', width: 32, key: 'creLine' },
+            { header: 'npokb ID', width: 13, key: 'npokbId' },
+        ];
+        const HEADER_ROW = 5;
+        const titleFont = { name: 'Arial', bold: true, size: 14, color: { argb: 'FF2d3748' } };
+        const doiFont = { name: 'Arial', size: 10, color: { argb: 'FF667eea' } };
+        const infoFont = { name: 'Arial', size: 10, color: { argb: 'FF718096' }, italic: true };
+        const dataFont = { name: 'Arial', size: 10 };
+
+        // Group cells by source
+        const sources = {};
+        CELL_TYPES.forEach(ct => {
+            const src = ct.sourceNomenclatureLabel;
+            if (!src) return;
+            if (!sources[src]) sources[src] = [];
+            sources[src].push(ct);
+        });
+
+        // Sort cells within each source by localLabel
+        for (const src in sources) {
+            sources[src].sort((a, b) => ((a.localLabel || a.preferredLabel) || '').localeCompare((b.localLabel || b.preferredLabel) || ''));
+        }
+
+        const sourceNames = Object.keys(sources).sort();
+
+        for (const srcName of sourceNames) {
+            const cellList = sources[srcName];
+            const sheetName = (CONCORDANCE_SOURCE_SHORT[srcName] || srcName).substring(0, 31);
+            const ws = wb.addWorksheet(sheetName);
+            const numCols = COLUMNS.length;
+
+            // DOI info
+            const doi = doiMap[srcName];
+            const doiUrl = doi ? doi.url : '';
+            const doiText = doiUrl ? doiUrl.replace(/^https?:\/\/doi\.org\//, '') : '';
+
+            // Row 1: Source name
+            ws.mergeCells(1, 1, 1, numCols);
+            const titleCell = ws.getCell('A1');
+            titleCell.value = `Source: ${srcName}`;
+            titleCell.font = titleFont;
+            titleCell.alignment = { vertical: 'middle' };
+
+            // Row 2: DOI
+            ws.mergeCells(2, 1, 2, numCols);
+            const doiCell = ws.getCell('A2');
+            doiCell.value = doiUrl ? { text: `DOI: ${doiText}`, hyperlink: doiUrl } : '';
+            doiCell.font = { ...doiFont, underline: true };
+
+            // Row 3: Info
+            ws.mergeCells(3, 1, 3, numCols);
+            const infoCell = ws.getCell('A3');
+            const today = new Date().toISOString().split('T')[0];
+            infoCell.value = `${cellList.length} cells  ·  Generated ${today}  ·  Please review each row and update the Status column`;
+            infoCell.font = infoFont;
+
+            // Row 4: spacer
+            ws.getRow(1).height = 24;
+            ws.getRow(4).height = 8;
+
+            // Row 5: Column headers
+            const headerRow = ws.getRow(HEADER_ROW);
+            COLUMNS.forEach((col, ci) => {
+                const cell = headerRow.getCell(ci + 1);
+                cell.value = col.header;
+                ws.getColumn(ci + 1).width = col.width;
+            });
+
+            // Data rows
+            cellList.forEach((ct, ri) => {
+                const rowNum = HEADER_ROW + 1 + ri;
+                const row = ws.getRow(rowNum);
+                row.getCell(1).value = 'Needs Review';
+                row.getCell(1).font = dataFont;
+                // Column 2 (Comments) left blank
+                row.getCell(3).value = ct.localLabel || ct.preferredLabel || '';
+                row.getCell(3).font = dataFont;
+                row.getCell(4).value = ct.species || '';
+                row.getCell(4).font = dataFont;
+                row.getCell(5).value = ct.geneExpressionString || '';
+                row.getCell(5).font = dataFont;
+                row.getCell(6).value = ct.fiberTypeString || '';
+                row.getCell(6).font = dataFont;
+                row.getCell(7).value = ct.functionalString || '';
+                row.getCell(7).font = dataFont;
+                row.getCell(8).value = ct.thresholdString || '';
+                row.getCell(8).font = dataFont;
+                row.getCell(9).value = ct.adaptationString || '';
+                row.getCell(9).font = dataFont;
+                row.getCell(10).value = ct.creLine || '';
+                row.getCell(10).font = dataFont;
+                row.getCell(11).value = ct.id || '';
+                row.getCell(11).font = dataFont;
+            });
+
+            const lastRow = HEADER_ROW + cellList.length;
+
+            // Data validation: Status dropdown
+            for (let r = HEADER_ROW + 1; r <= lastRow; r++) {
+                ws.getCell(r, 1).dataValidation = {
+                    type: 'list',
+                    allowBlank: false,
+                    formulae: ['"Needs Review,Reviewed,Corrected"'],
+                    showErrorMessage: true,
+                    errorTitle: 'Invalid Status',
+                    error: 'Please select: Needs Review, Reviewed, or Corrected'
+                };
+            }
+
+            // Conditional formatting: Status colors
+            const statusRange = `A${HEADER_ROW + 1}:A${lastRow}`;
+            ws.addConditionalFormatting({
+                ref: statusRange,
+                rules: [
+                    { type: 'cellIs', operator: 'equal', formulae: ['"Needs Review"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEF3C7' } } }, priority: 1 },
+                    { type: 'cellIs', operator: 'equal', formulae: ['"Reviewed"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFD1FAE5' } } }, priority: 2 },
+                    { type: 'cellIs', operator: 'equal', formulae: ['"Corrected"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEE2E2' } } }, priority: 3 },
+                ]
+            });
+
+            // Auto-filter
+            ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: lastRow, column: numCols } };
+
+            // Freeze panes: lock columns A-C and header rows
+            ws.views = [{ state: 'frozen', xSplit: 3, ySplit: HEADER_ROW }];
+        }
+
+        // Save
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'NervoSensus_Source_Review.xlsx';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Export failed:', err);
+        alert('Export failed: ' + err.message);
+    }
+}
+
 function copyCellDetailLink() {
     const url = window.location.href.split('?')[0].split('#')[0] + location.hash;
     navigator.clipboard.writeText(url).then(() => showPermalinkToast());

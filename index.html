@@ -10,6 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
 
 <body>
@@ -347,6 +348,7 @@
                     <button class="align-toggle-btn" id="alignExpandAll" onclick="toggleAlignAll()">Expand All</button>
                     <span class="align-count" id="alignCount"></span>
                     <button class="permalink-btn" onclick="copyAlignLink()" style="margin-left:auto;">🔗 Copy Link</button>
+                    <button class="permalink-btn" onclick="exportSourceReviewXlsx()" style="margin-left:0.5rem;">📊 Export .xlsx</button>
                 </div>
                 <div class="align-table-wrapper">
                     <table class="align-table" id="alignTable"></table>

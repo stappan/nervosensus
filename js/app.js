@@ -277,6 +277,7 @@ function parseNPOData(rows) {
             markerGenes: [], geneExpressionString: '',
             fiberTypeString: '', fiberTypeStringAbbrev: '',
             physiologyString: '', physiologyStringAbbrev: '',
+            thresholdString: '', adaptationString: '', functionalString: '',
             creLine: '', color: sourceColor,
             masterLabel: subclassMap[nid] || '',
             relatedCells: [], mapsTo: [], assertedSubclassOf: [], geneBaseNames: [],
@@ -375,6 +376,9 @@ function parseNPOData(rows) {
         ct.fiberTypeString = axonItems.map(a => a.display).join(' + ');
         ct.fiberTypeStringAbbrev = ct.fiberTypeString;
         
+        ct.thresholdString = thresholdItems.map(p => p.display).join(', ');
+        ct.adaptationString = adaptationItems.map(p => p.display).join(', ');
+        ct.functionalString = functionalItems.map(p => p.display).join(', ');
         const allPhys = [...thresholdItems, ...adaptationItems, ...functionalItems];
         ct.physiologyString = allPhys.map(p => p.display).join(' + ');
         ct.physiologyStringAbbrev = ct.physiologyString;
@@ -2983,25 +2987,10 @@ function buildCompareDetailHTML(anchorIdx) {
     const phenotypeRows = [
         { label: 'Species', key: 'species', getValue: ct => ct.species || '—' },
         { label: 'Soma Location', key: 'soma', getValue: ct => (ct.somaLocations && ct.somaLocations.length) ? ct.somaLocations.join(', ') : (ct.somaLocation || '—') },
-        { label: 'Functional Phenotype', key: 'physiology', getValue: ct => ct.physiologyString || '—' },
         { label: 'Axon Phenotype', key: 'axon', getValue: ct => ct.fiberTypeString || '—' },
-        { label: 'Threshold Phenotype', key: 'threshold', getValue: ct => {
-            if (!ct.clusterAttributes) return '—';
-            const flags = [];
-            if (ct.clusterAttributes.cold_sensitive) flags.push('cold sensitive');
-            if (ct.clusterAttributes.heat_sensitive) flags.push('heat sensitive');
-            if (ct.clusterAttributes.mechanosensitive_ltm) flags.push('LTM');
-            if (ct.clusterAttributes.mechanosensitive_htm) flags.push('HTM');
-            if (ct.clusterAttributes.proprioceptive) flags.push('proprioceptive');
-            return flags.length ? flags.join(', ') : '—';
-        }},
-        { label: 'Adaptation Phenotype', key: 'adaptation', getValue: ct => {
-            if (!ct.clusterAttributes) return '—';
-            const flags = [];
-            if (ct.clusterAttributes.rapidly_adapting) flags.push('rapidly adapting');
-            if (ct.clusterAttributes.slowly_adapting) flags.push('slowly adapting');
-            return flags.length ? flags.join(', ') : '—';
-        }},
+        { label: 'Functional Phenotype', key: 'physiology', getValue: ct => ct.functionalString || '—' },
+        { label: 'Threshold Phenotype', key: 'threshold', getValue: ct => ct.thresholdString || '—' },
+        { label: 'Adaptation Phenotype', key: 'adaptation', getValue: ct => ct.adaptationString || '—' },
         { label: 'Marker Genes', key: 'genes', getValue: ct => {
             if (!ct.markerGenes || !ct.markerGenes.length) return '—';
             return ct.markerGenes.map(g => g.name).join(', ');
@@ -3177,6 +3166,7 @@ function renderCompareView(anchorPreset, comparePreset) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('dataStatus').textContent = `Default data (${CELL_TYPES.length} cells)`;
     renderCards();
     initGeneButtons();
     document.querySelectorAll('.view-btn').forEach(btn=>{btn.addEventListener('click',()=>switchView(btn.dataset.view));});

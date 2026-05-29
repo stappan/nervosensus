@@ -238,6 +238,9 @@ def parse_npo_data(rows):
             'fiberTypeStringAbbrev': '',
             'physiologyString': '',
             'physiologyStringAbbrev': '',
+            'thresholdString': '',
+            'adaptationString': '',
+            'functionalString': '',
             'creLine': '',
             'color': source_color,
             'masterLabel': '',
@@ -394,6 +397,9 @@ def parse_npo_data(rows):
         ct['fiberTypeString'] = ' + '.join(a['display'] for a in axon_items)
         ct['fiberTypeStringAbbrev'] = ct['fiberTypeString']
 
+        ct['thresholdString'] = ', '.join(p['display'] for p in threshold_items)
+        ct['adaptationString'] = ', '.join(p['display'] for p in adaptation_items)
+        ct['functionalString'] = ', '.join(p['display'] for p in functional_items)
         all_phys = threshold_items + adaptation_items + functional_items
         ct['physiologyString'] = ' + '.join(p['display'] for p in all_phys)
         ct['physiologyStringAbbrev'] = ct['physiologyString']

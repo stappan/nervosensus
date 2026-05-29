@@ -73,6 +73,23 @@ function formatFiberType(s) { return s ? s.replace(/type Ad/g,'type Aδ').replac
 function getSourceLinkText(ct) { return ct.sourceNomenclatureLabel || 'View Source Publication'; }
 function extractDOI(url) { if (!url) return ''; const m = url.match(/doi\.org\/(.+)$/); return m ? m[1] : url; }
 function buildSourceLine(ct) { const doi = extractDOI(ct.sourceNomenclature); return `<div class="card-source-line"><span class="card-source-name" style="color:${ct.sourceColor||'#667eea'}">${ct.sourceNomenclatureLabel||''}</span>${doi ? `<span class="card-source-sep">·</span><a class="card-source-doi" href="${ct.sourceNomenclature}" target="_blank" rel="noopener" onclick="event.stopPropagation();">${doi}</a>` : ''}</div>`; }
+function getSourceDOIMap() {
+    const map = {};
+    CELL_TYPES.forEach(ct => {
+        if (ct.sourceNomenclatureLabel && ct.sourceNomenclature && !map[ct.sourceNomenclatureLabel])
+            map[ct.sourceNomenclatureLabel] = { url: ct.sourceNomenclature, color: ct.sourceColor || '#667eea' };
+    });
+    return map;
+}
+function buildSourceRefsHTML(sourceNames) {
+    const doiMap = getSourceDOIMap();
+    return sourceNames.filter(s => doiMap[s]).map(s => {
+        const { url, color } = doiMap[s];
+        const doi = extractDOI(url);
+        return '<span class="source-ref-item"><span class="source-ref-name" style="color:' + color + '">' + s + '</span>' +
+            (doi ? '<span class="source-ref-sep">·</span><a class="source-ref-doi" href="' + url + '" target="_blank" rel="noopener">' + doi + '</a>' : '') + '</span>';
+    }).join('');
+}
 function linkifyUrls(text) {
     if (!text) return '';
     return text.replace(/(https?:\/\/[^\s<)"',]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">$1</a>');
@@ -1039,6 +1056,15 @@ function renderAlignView() {
     const totalRelated = sortedRows.reduce((sum, r) => sum + r.children.length, 0);
     if (countEl) countEl.textContent = bigDrgCells.length + ' Big DRG cells · ' + totalRelated + ' related cells';
 
+    // Source references
+    const alignSources = new Set();
+    sortedRows.forEach(r => {
+        alignSources.add(r.parent.sourceNomenclatureLabel);
+        r.children.forEach(c => alignSources.add(c.sourceNomenclatureLabel));
+    });
+    const refsEl = document.getElementById('alignSourceRefs');
+    if (refsEl) refsEl.innerHTML = buildSourceRefsHTML([...alignSources]);
+
     // Build header
     let html = '<thead><tr>';
     columns.forEach(col => {
@@ -1320,6 +1346,10 @@ function updateConcordanceTable() {
 
     rows.sort((a, b) => a.parentLabel.localeCompare(b.parentLabel));
 
+    // Source references
+    const concRefsEl = document.getElementById('concordanceSourceRefs');
+    if (concRefsEl) concRefsEl.innerHTML = buildSourceRefsHTML(displaySources);
+
     // Count
     let totalMapped = 0;
     rows.forEach(r => {
@@ -1500,12 +1530,27 @@ async function exportConcordanceDocx() {
                         children: [new D.TextRun({ text: 'NervoSensus — Cross-Source Concordance', bold: true, size: 32, color: '2d3748', font: 'Arial' })]
                     }),
                     new D.Paragraph({
-                        spacing: { after: 200 },
+                        spacing: { after: 100 },
                         children: [
                             new D.TextRun({ text: 'Anchor: ' + anchorSource + ' (' + anchorCells.length + ' cell types). ', size: 18, color: '718096', font: 'Arial' }),
                             new D.TextRun({ text: 'Columns show the local label (ilxtr:localLabel) each source uses for its corresponding cell type.', size: 18, color: '718096', font: 'Arial' })
                         ]
                     }),
+                    ...displaySources.map(src => {
+                        const doiMap = getSourceDOIMap();
+                        const info = doiMap[src];
+                        const doi = info ? extractDOI(info.url) : '';
+                        const children = [new D.TextRun({ text: src, bold: true, size: 16, color: (info ? info.color.replace('#', '') : '667eea'), font: 'Arial' })];
+                        if (doi && info) {
+                            children.push(new D.TextRun({ text: '  ·  ', size: 16, color: 'cbd5e0', font: 'Arial' }));
+                            children.push(new D.ExternalHyperlink({
+                                children: [new D.TextRun({ text: doi, style: 'Hyperlink', size: 16, color: '667eea', font: 'Arial' })],
+                                link: info.url
+                            }));
+                        }
+                        return new D.Paragraph({ spacing: { before: 20, after: 20 }, children });
+                    }),
+                    new D.Paragraph({ spacing: { after: 100 }, children: [] }),
                     table,
                     new D.Paragraph({ children: [] }),
                     new D.Paragraph({

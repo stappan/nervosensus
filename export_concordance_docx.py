@@ -144,6 +144,48 @@ run2 = sub_para.add_run(f'Columns show the local label (ilxtr:localLabel) each s
 run2.font.size = Pt(9)
 run2.font.color.rgb = RGBColor(0x71, 0x80, 0x96)
 
+# Source DOI references
+source_dois = {}
+for c in cells:
+    s = c.get('sourceNomenclatureLabel', '')
+    u = c.get('sourceNomenclature', '')
+    if s and u and s not in source_dois:
+        source_dois[s] = u
+
+for src in display_sources:
+    doi_url = source_dois.get(src, '')
+    ref_para = doc.add_paragraph()
+    ref_para.paragraph_format.space_before = Pt(1)
+    ref_para.paragraph_format.space_after = Pt(1)
+    hex_color = SOURCE_COLORS.get(src, 'FF667eea')[2:]
+    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+    name_run = ref_para.add_run(src)
+    name_run.font.size = Pt(8)
+    name_run.font.bold = True
+    name_run.font.color.rgb = RGBColor(r, g, b)
+    if doi_url:
+        sep_run = ref_para.add_run('  ·  ')
+        sep_run.font.size = Pt(8)
+        sep_run.font.color.rgb = RGBColor(0xcb, 0xd5, 0xe0)
+        import re as _re
+        doi_text = _re.sub(r'^https?://doi\.org/', '', doi_url)
+        hyperlink = OxmlElement('w:hyperlink')
+        hyperlink.set(qn('w:history'), '1')
+        r_id = doc.part.relate_to(doi_url, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
+        hyperlink.set(qn('r:id'), r_id)
+        new_run = OxmlElement('w:r')
+        rPr = OxmlElement('w:rPr')
+        for tag, attrs in [('w:rStyle', {'w:val': 'Hyperlink'}), ('w:sz', {'w:val': '16'}), ('w:color', {'w:val': '667eea'}), ('w:u', {'w:val': 'single'})]:
+            el = OxmlElement(tag)
+            for k, v in attrs.items(): el.set(qn(k), v)
+            rPr.append(el)
+        new_run.append(rPr)
+        new_run.text = doi_text
+        hyperlink.append(new_run)
+        ref_para._p.append(hyperlink)
+
+doc.add_paragraph()  # spacer before table
+
 # ── Helper functions ─────────────────────────────────────────────────
 def shade_cell(cell, color_hex):
     shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}"/>')

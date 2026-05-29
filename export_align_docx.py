@@ -4,7 +4,7 @@ from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn, nsdecls
-from docx.oxml import parse_xml
+from docx.oxml import parse_xml, OxmlElement
 
 # ── Load cell data from data.js ──────────────────────────────────────
 with open('js/data.js', 'r', encoding='utf-8') as f:
@@ -162,6 +162,58 @@ legend_run = legend_para.add_run('✓ = feature present    — = feature absent 
 legend_run.font.size = Pt(8)
 legend_run.font.color.rgb = RGBColor(0x71, 0x80, 0x96)
 legend_run.font.italic = True
+
+# Source DOI references
+source_dois = {}
+source_colors_hex = {}
+for c in cells:
+    s = c.get('sourceNomenclatureLabel', '')
+    u = c.get('sourceNomenclature', '')
+    sc = c.get('sourceColor', '')
+    if s and u and s not in source_dois:
+        source_dois[s] = u
+    if s and sc and s not in source_colors_hex:
+        source_colors_hex[s] = sc.lstrip('#')
+
+# Collect all sources that appear in the alignment
+align_sources = set()
+for pi, pc, ch in sorted_rows:
+    align_sources.add(pc.get('sourceNomenclatureLabel', ''))
+    for ci_idx, child_ct in ch:
+        align_sources.add(child_ct.get('sourceNomenclatureLabel', ''))
+
+for src in sorted(align_sources):
+    doi_url = source_dois.get(src, '')
+    ref_para = doc.add_paragraph()
+    ref_para.paragraph_format.space_before = Pt(1)
+    ref_para.paragraph_format.space_after = Pt(1)
+    hex_color = source_colors_hex.get(src, '667eea')
+    r_c, g_c, b_c = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+    name_run = ref_para.add_run(src)
+    name_run.font.size = Pt(8)
+    name_run.font.bold = True
+    name_run.font.color.rgb = RGBColor(r_c, g_c, b_c)
+    if doi_url:
+        sep_run = ref_para.add_run('  ·  ')
+        sep_run.font.size = Pt(8)
+        sep_run.font.color.rgb = RGBColor(0xcb, 0xd5, 0xe0)
+        doi_text = re.sub(r'^https?://doi\.org/', '', doi_url)
+        hyperlink = OxmlElement('w:hyperlink')
+        hyperlink.set(qn('w:history'), '1')
+        r_id = doc.part.relate_to(doi_url, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
+        hyperlink.set(qn('r:id'), r_id)
+        new_run = OxmlElement('w:r')
+        rPr = OxmlElement('w:rPr')
+        for tag, attrs in [('w:rStyle', {'w:val': 'Hyperlink'}), ('w:sz', {'w:val': '16'}), ('w:color', {'w:val': '667eea'}), ('w:u', {'w:val': 'single'})]:
+            el = OxmlElement(tag)
+            for k, v in attrs.items(): el.set(qn(k), v)
+            rPr.append(el)
+        new_run.append(rPr)
+        new_run.text = doi_text
+        hyperlink.append(new_run)
+        ref_para._p.append(hyperlink)
+
+doc.add_paragraph()  # spacer before table
 
 # Count total rows for the table
 total_data_rows = 0

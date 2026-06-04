@@ -2707,8 +2707,8 @@ function renderCellDetailView(idx) {
         `</div>`;
     document.getElementById('cellDetailViewContainer').style.display = 'block';
     document.getElementById('cellDetailViewContainer').scrollTop = 0;
-    window.scrollTo(0, 0);
-    ['cardViewContainer','treeViewContainer','synthesisViewContainer','clusterViewContainer','lineageViewContainer','compareViewContainer'].forEach(id => {
+    document.getElementById('cellDetailViewContainer').scrollIntoView({behavior: 'instant', block: 'start'});
+    ['cardViewContainer','treeViewContainer','synthesisViewContainer','clusterViewContainer','lineageViewContainer','compareViewContainer','alignViewContainer','concordanceViewContainer'].forEach(id => {
         document.getElementById(id).style.display = 'none';
     });
     document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));

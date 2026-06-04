@@ -3045,7 +3045,7 @@ async function exportAlignDocx() {
 
         function makeCellLink(ct, isParent) {
             const label = ct.localLabel || ct.preferredLabel;
-            const href = baseUrl + '#cell/' + (ct.id || '');
+            const href = baseUrl + '?detail=' + encodeURIComponent(ct.id || '');
             return new D.ExternalHyperlink({
                 link: href,
                 children: [new D.TextRun({
@@ -3601,7 +3601,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Deep-link support: parse URL parameters to set view and filters
     // Example: ?view=cards&source=big+DRG+paper&species=mouse&axon=fiber_c&location=soma_drg&gene=Trpv1&equiv=yes&cell=CLTM1
     const params = new URLSearchParams(window.location.search);
-    if (params.toString()) {
+    const detailParam = params.get('detail');
+    if (detailParam) {
+        // Direct cell detail link (e.g. ?detail=npokb:1059) — used by docx export
+        const cellId = decodeURIComponent(detailParam);
+        const idx = ID_INDEX[cellId] ?? -1;
+        if (idx !== -1) {
+            renderCellDetailView(idx);
+        } else {
+            switchView('cluster');
+        }
+    } else if (params.toString()) {
         const view = params.get('view');
         const source = params.get('source');
         const species = params.get('species');

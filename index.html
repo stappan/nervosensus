@@ -349,6 +349,7 @@
                     <span class="align-count" id="alignCount"></span>
                     <button class="permalink-btn" onclick="copyAlignLink()" style="margin-left:auto;">🔗 Copy Link</button>
                     <button class="permalink-btn" onclick="exportSourceReviewXlsx()" style="margin-left:0.5rem;">📊 Export .xlsx</button>
+                    <button class="permalink-btn" onclick="exportAlignDocx()" style="margin-left:0.5rem;">📄 Export .docx</button>
                 </div>
                 <div class="align-table-wrapper">
                     <table class="align-table" id="alignTable"></table>
@@ -386,6 +387,7 @@
         <div id="cellDetailViewContainer" class="view-container" style="display:none;">
             <div id="cellDetailContent"></div>
         </div>
+        <footer class="sources-footer" id="sourcesFooter"></footer>
     </div>
     <div id="permalinkToast" class="permalink-toast" style="display:none;">Link copied to clipboard!</div>
     <div class="modal" id="modal">

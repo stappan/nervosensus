@@ -521,3 +521,13 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .conc-control-group { display: flex; align-items: center; gap: 0.5rem; }
 .conc-control-group label { font-size: 0.8rem; color: #4a5568; font-weight: 600; white-space: nowrap; }
 .conc-control-group select { padding: 0.4rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: white; }
+
+/* ── Sources Footer ───────────────────────────────────────────────── */
+.sources-footer { margin-top: 3rem; padding: 1.5rem; border-top: 1px solid #e2e8f0; background: #f8fafc; border-radius: 0 0 8px 8px; }
+.sources-footer-title { font-size: 0.85rem; font-weight: 700; color: #4a5568; margin-bottom: 0.5rem; }
+.sources-footer-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.sources-footer-item { display: flex; align-items: baseline; gap: 0.4rem; font-size: 0.8rem; line-height: 1.4; }
+.sources-footer-name { font-weight: 600; white-space: nowrap; }
+.sources-footer-sep { color: #cbd5e0; }
+.sources-footer-doi { color: #667eea; text-decoration: none; font-size: 0.75rem; }
+.sources-footer-doi:hover { text-decoration: underline; }

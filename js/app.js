@@ -451,7 +451,7 @@ function initGeneButtons() {
     });
 }
 
-function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); ID_INDEX=buildIdIndex(); closeUploadModal(); selectedAttributes=[]; renderCards(); }
+function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); ID_INDEX=buildIdIndex(); closeUploadModal(); selectedAttributes=[]; renderSourcesFooter(); renderCards(); }
 const VIEW_NAMES = { cards: 'Card View', tree: 'Tree View', synthesis: 'Synthesis View', cluster: 'Cluster View', lineage: 'Provisional Mapping', compare: 'Compare', align: 'Align View', concordance: 'Concordance' };
 function openFeedback() { const name = VIEW_NAMES[currentView] || currentView; window.open('nervosensus-feedback.html?view=' + encodeURIComponent(name), '_blank'); }
 function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cellDetailViewContainer').style.display='none'; document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; document.getElementById('alignViewContainer').style.display=view==='align'?'block':'none'; document.getElementById('concordanceViewContainer').style.display=view==='concordance'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); if(view==='align')renderAlignView(); if(view==='concordance')renderConcordanceView(); if(location.hash.startsWith('#cell/'))history.replaceState(null,'',location.pathname+location.search); }
@@ -2969,6 +2969,249 @@ async function exportSourceReviewXlsx() {
     }
 }
 
+async function exportAlignDocx() {
+    if (typeof docx === 'undefined') {
+        alert('Document export library not loaded. Please check your internet connection and reload the page.');
+        return;
+    }
+    try {
+        const D = docx;
+        const baseUrl = window.location.href.split('?')[0].split('#')[0];
+        const doiMap = getSourceDOIMap();
+
+        // Source color map (strip # for docx hex)
+        const sourceColorMap = {};
+        CELL_TYPES.forEach(ct => {
+            if (ct.sourceNomenclatureLabel && ct.sourceColor)
+                sourceColorMap[ct.sourceNomenclatureLabel] = ct.sourceColor.replace('#', '');
+        });
+
+        // Build align data (same logic as renderAlignView)
+        const bigDrgCells = [];
+        CELL_TYPES.forEach((ct, idx) => {
+            if (ct.sourceNomenclatureLabel === 'big DRG paper')
+                bigDrgCells.push({ ...ct, origIdx: idx });
+        });
+
+        const parentRows = [];
+        bigDrgCells.forEach(parentCt => {
+            const rels = getAssertedRelationships(parentCt.origIdx);
+            const children = [];
+            [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes].forEach(r => {
+                if (r.idx !== parentCt.origIdx && CELL_TYPES[r.idx].sourceNomenclatureLabel !== 'big DRG paper') {
+                    if (!children.find(c => c.origIdx === r.idx))
+                        children.push({ ...CELL_TYPES[r.idx], origIdx: r.idx });
+                }
+            });
+            children.sort((a, b) => (a.sourceNomenclatureLabel || '').localeCompare(b.sourceNomenclatureLabel || ''));
+            parentRows.push({ parent: parentCt, children });
+        });
+
+        const withChildren = parentRows.filter(r => r.children.length > 0)
+            .sort((a, b) => a.parent.preferredLabel.localeCompare(b.parent.preferredLabel));
+        const withoutChildren = parentRows.filter(r => r.children.length === 0)
+            .sort((a, b) => a.parent.preferredLabel.localeCompare(b.parent.preferredLabel));
+        const sortedRows = [...withChildren, ...withoutChildren];
+        const totalRelated = sortedRows.reduce((sum, r) => sum + r.children.length, 0);
+
+        // Columns: Cell Type, Source, Marker Genes, Aβ, Aδ, C, LTM, HTM, Temp, Proprio, RA, SA, Species
+        const colDefs = [
+            { label: 'Cell Type', width: 28 },
+            { label: 'Source', width: 14 },
+            { label: 'Marker Genes', width: 16 },
+            { label: 'Aβ', width: 4 },
+            { label: 'Aδ', width: 4 },
+            { label: 'C', width: 4 },
+            { label: 'LTM', width: 5 },
+            { label: 'HTM', width: 5 },
+            { label: 'Temp', width: 6 },
+            { label: 'Proprio', width: 6 },
+            { label: 'RA', width: 4 },
+            { label: 'SA', width: 4 },
+        ];
+        const totalPct = colDefs.reduce((s, c) => s + c.width, 0);
+
+        function boolCell(val) {
+            return new D.TableCell({
+                children: [new D.Paragraph({
+                    alignment: D.AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+                    children: [new D.TextRun({ text: val ? '✓' : '—', size: 16, font: 'Arial',
+                        color: val ? '22c55e' : 'cbd5e0' })]
+                })],
+                width: { size: Math.round(colDefs[3].width / totalPct * 100), type: D.WidthType.PERCENTAGE },
+                verticalAlign: D.VerticalAlign.CENTER
+            });
+        }
+
+        function makeCellLink(ct, isParent) {
+            const label = ct.localLabel || ct.preferredLabel;
+            const href = baseUrl + '#cell/' + (ct.id || '');
+            return new D.ExternalHyperlink({
+                link: href,
+                children: [new D.TextRun({
+                    text: (isParent ? '' : '    ') + label,
+                    size: isParent ? 18 : 16,
+                    bold: isParent,
+                    font: 'Arial',
+                    color: isParent ? '1a202c' : '4a5568',
+                    underline: { type: D.UnderlineType.SINGLE, color: isParent ? '1a202c' : '667eea' }
+                })]
+            });
+        }
+
+        function buildRow(ct, isParent) {
+            const ca = ct.clusterAttributes || {};
+            const srcColor = sourceColorMap[ct.sourceNomenclatureLabel] || '718096';
+            const srcShort = CONCORDANCE_SOURCE_SHORT[ct.sourceNomenclatureLabel] || ct.sourceNomenclatureLabel || '';
+            const genes = getMarkerGeneNames(ct);
+            const temp = getAlignTemperature(ct);
+
+            const pctW = (i) => Math.round(colDefs[i].width / totalPct * 100);
+            const cells = [
+                // Cell Type (hyperlinked)
+                new D.TableCell({
+                    children: [new D.Paragraph({
+                        spacing: { before: 20, after: 20 },
+                        children: [makeCellLink(ct, isParent)]
+                    })],
+                    width: { size: pctW(0), type: D.WidthType.PERCENTAGE },
+                    shading: isParent ? { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' } : undefined
+                }),
+                // Source
+                new D.TableCell({
+                    children: [new D.Paragraph({
+                        spacing: { before: 20, after: 20 },
+                        children: [new D.TextRun({ text: srcShort, size: 14, font: 'Arial', color: srcColor })]
+                    })],
+                    width: { size: pctW(1), type: D.WidthType.PERCENTAGE },
+                    shading: isParent ? { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' } : undefined
+                }),
+                // Marker Genes
+                new D.TableCell({
+                    children: [new D.Paragraph({
+                        spacing: { before: 20, after: 20 },
+                        children: [new D.TextRun({ text: genes || '—', size: 14, font: 'Arial', color: genes ? '2d3748' : 'cbd5e0' })]
+                    })],
+                    width: { size: pctW(2), type: D.WidthType.PERCENTAGE },
+                    shading: isParent ? { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' } : undefined
+                }),
+            ];
+            // Boolean columns
+            const boolKeys = ['fiber_a_beta', 'fiber_a_delta', 'fiber_c', 'mechanosensitive_ltm', 'mechanosensitive_htm'];
+            boolKeys.forEach((key, i) => {
+                const c = boolCell(ca[key]);
+                if (isParent) c.shading = { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' };
+                cells.push(c);
+            });
+            // Temperature
+            cells.push(new D.TableCell({
+                children: [new D.Paragraph({
+                    alignment: D.AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+                    children: [new D.TextRun({ text: temp || '—', size: 14, font: 'Arial', color: temp ? '2d3748' : 'cbd5e0' })]
+                })],
+                width: { size: pctW(9), type: D.WidthType.PERCENTAGE },
+                shading: isParent ? { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' } : undefined
+            }));
+            // Proprio, RA, SA
+            ['proprioceptive', 'rapidly_adapting', 'slowly_adapting'].forEach(key => {
+                const c = boolCell(ca[key]);
+                if (isParent) c.shading = { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' };
+                cells.push(c);
+            });
+
+            return new D.TableRow({ children: cells });
+        }
+
+        // Header row
+        const headerCells = colDefs.map((col, i) => new D.TableCell({
+            children: [new D.Paragraph({
+                alignment: D.AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+                children: [new D.TextRun({ text: col.label, bold: true, size: 16, color: 'FFFFFF', font: 'Arial' })]
+            })],
+            shading: { fill: '4a5568', type: D.ShadingType.CLEAR, color: 'auto' },
+            width: { size: Math.round(col.width / totalPct * 100), type: D.WidthType.PERCENTAGE }
+        }));
+        const headerRow = new D.TableRow({ children: headerCells, tableHeader: true });
+
+        // Build all data rows
+        const dataRows = [];
+        sortedRows.forEach(({ parent, children }) => {
+            dataRows.push(buildRow(parent, true));
+            children.forEach(child => dataRows.push(buildRow(child, false)));
+        });
+
+        // Source DOI references
+        const sourceNames = Object.keys(doiMap).sort();
+        const sourceParas = sourceNames.map(name => {
+            const { url, color } = doiMap[name];
+            const doi = extractDOI(url);
+            const hexColor = color.replace('#', '');
+            const children = [new D.TextRun({ text: name, bold: true, size: 16, font: 'Arial', color: hexColor })];
+            if (doi) {
+                children.push(new D.TextRun({ text: '  ·  ', size: 16, font: 'Arial', color: 'cbd5e0' }));
+                children.push(new D.ExternalHyperlink({
+                    link: url,
+                    children: [new D.TextRun({ text: doi, size: 16, font: 'Arial', color: '667eea', underline: { type: D.UnderlineType.SINGLE, color: '667eea' } })]
+                }));
+            }
+            return new D.Paragraph({ spacing: { before: 20, after: 20 }, children });
+        });
+
+        // Build document
+        const doc = new D.Document({
+            sections: [{
+                properties: {
+                    page: {
+                        size: { orientation: D.PageOrientation.LANDSCAPE, width: 16838, height: 11906 },
+                        margin: { top: 720, bottom: 720, left: 720, right: 720 }
+                    }
+                },
+                children: [
+                    new D.Paragraph({
+                        spacing: { after: 100 },
+                        children: [new D.TextRun({ text: 'NervoSensus — Cross-Source Alignment', bold: true, size: 32, font: 'Arial', color: '2d3748' })]
+                    }),
+                    new D.Paragraph({
+                        spacing: { after: 60 },
+                        children: [new D.TextRun({
+                            text: `${bigDrgCells.length} Big DRG anchor cells · ${totalRelated} related cells from other sources · Generated ${new Date().toISOString().split('T')[0]}`,
+                            size: 18, font: 'Arial', color: '718096', italics: true
+                        })]
+                    }),
+                    ...sourceParas,
+                    new D.Paragraph({ spacing: { before: 100, after: 100 } }),
+                    new D.Table({
+                        rows: [headerRow, ...dataRows],
+                        width: { size: 100, type: D.WidthType.PERCENTAGE },
+                        layout: D.TableLayoutType.FIXED
+                    }),
+                    new D.Paragraph({ spacing: { before: 200 } }),
+                    new D.Paragraph({
+                        children: [
+                            new D.TextRun({ text: 'Explore interactively: ', size: 18, font: 'Arial', color: '718096' }),
+                            new D.ExternalHyperlink({
+                                link: baseUrl + '?view=align',
+                                children: [new D.TextRun({ text: 'NervoSensus Align View', size: 18, font: 'Arial', color: '667eea', underline: { type: D.UnderlineType.SINGLE, color: '667eea' } })]
+                            })
+                        ]
+                    })
+                ]
+            }]
+        });
+
+        const buffer = await D.Packer.toBlob(doc);
+        const url = URL.createObjectURL(buffer);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'NervoSensus_Alignment.docx';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Export failed:', err);
+        alert('Export failed: ' + err.message);
+    }
+}
+
 function copyCellDetailLink() {
     const url = window.location.href.split('?')[0].split('#')[0] + location.hash;
     navigator.clipboard.writeText(url).then(() => showPermalinkToast());
@@ -3326,8 +3569,27 @@ function renderCompareView(anchorPreset, comparePreset) {
     updateCompareTable();
 }
 
+function renderSourcesFooter() {
+    const footer = document.getElementById('sourcesFooter');
+    if (!footer) return;
+    const doiMap = getSourceDOIMap();
+    const sourceNames = Object.keys(doiMap).sort();
+    if (!sourceNames.length) { footer.innerHTML = ''; return; }
+    let html = '<div class="sources-footer-title">Sources</div><div class="sources-footer-list">';
+    sourceNames.forEach(name => {
+        const { url, color } = doiMap[name];
+        const doi = extractDOI(url);
+        html += `<div class="sources-footer-item"><span class="sources-footer-name" style="color:${color}">${name}</span>`;
+        if (doi) html += `<span class="sources-footer-sep">·</span><a class="sources-footer-doi" href="${url}" target="_blank">${doi}</a>`;
+        html += '</div>';
+    });
+    html += '</div>';
+    footer.innerHTML = html;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('dataStatus').textContent = `Default data (${CELL_TYPES.length} cells)`;
+    renderSourcesFooter();
     renderCards();
     initGeneButtons();
     document.querySelectorAll('.view-btn').forEach(btn=>{btn.addEventListener('click',()=>switchView(btn.dataset.view));});

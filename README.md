@@ -2,38 +2,34 @@
 
 **An interactive visualization of somatosensory neuron cell types across species and nomenclatures**
 
-NervoSensus is a self-contained, single-file HTML application for exploring 145 somatosensory neuron cell types drawn from 7 published sources. It integrates cross-study equivalence and subtype relationships, marker gene expression, axon phenotypes, physiology, and species data into a unified interface with five complementary views.
+NervoSensus is a client-side web application for exploring 153 somatosensory cell types (143 neurons + 10 non-neuronal) drawn from 6 published sources. It integrates cross-study equivalence and subtype relationships, marker gene expression, axon phenotypes, physiology, and species data into a unified interface with seven complementary views.
 
 ---
 
 ## Data
 
-### Sources (7 publications, 145 cell types)
+### Sources (6 publications, 153 cell types)
 
 | Source | Cells | Color | DOI |
 |--------|------:|-------|-----|
-| CSA paper (Bhuiyan et al.) | 54 | Purple | [10.1126/sciadv.adj9173](https://doi.org/10.1126/sciadv.adj9173) |
-| Big DRG paper (Bhuiyan et al., 2025) | 22 | Amber | [10.1101/2025.11.05.686654](https://doi.org/10.1101/2025.11.05.686654) |
+| Bhuiyan et al., 2024 | 54 | Purple | [10.1126/sciadv.adj9173](https://doi.org/10.1126/sciadv.adj9173) |
+| Bhuiyan et al., 2025 | 31 | Amber | [10.1101/2025.11.05.686654](https://doi.org/10.1101/2025.11.05.686654) |
 | Krauter et al., 2025 | 22 | Violet | [10.1038/s42003-025-08315-1](https://doi.org/10.1038/s42003-025-08315-1) |
 | Qi et al., 2024 | 17 | Cyan | [10.1016/j.cell.2024.02.006](https://doi.org/10.1016/j.cell.2024.02.006) |
 | Yu et al., 2024 | 16 | Red | [10.1038/s41593-024-01794-1](https://doi.org/10.1038/s41593-024-01794-1) |
 | Tavares-Ferreira et al., 2022 | 12 | Green | [10.1126/scitranslmed.abj8186](https://doi.org/10.1126/scitranslmed.abj8186) |
-| Kupari et al., 2021 | 9 | Pink | [10.1038/s41467-021-21725-z](https://doi.org/10.1038/s41467-021-21725-z) |
+
+### Non-neuronal cells
+
+10 non-neuronal cell types (baseClass "cell" rather than "neuron") from Bhuiyan et al., 2025: satellite glial cell, myelinating Schwann cell, non-myelinating Schwann cell, endothelial cell, mural cell, 3 fibroblast subtypes, adipocyte, and immune cell. These appear in the Tree View under a dedicated "Non-neuronal Cells" section grouped by subclass (Glial, Vascular, Stromal, Other), and are excluded from the Lineage View.
 
 ### Cell type families
 
-The CSA paper defines 18 master cell type families, each with species variants across mouse, human, macaque, and guinea pig (where available). Examples include DRG Pvalb neuron (4 variants), DRG TG Trpm8 neuron (4 variants), and DRG TG Calca+Smr2 neuron (4 variants).
+Bhuiyan et al., 2024 defines 18 master cell type families, each with species variants across mouse, human, macaque, and guinea pig (where available). Examples include DRG Pvalb neuron (4 variants), DRG TG Trpm8 neuron (4 variants), and DRG TG Calca+Smr2 neuron (4 variants).
 
-### Species coverage
+### Cell identifiers
 
-- **Human**: 63 cell types
-- **Mouse**: 57 cell types
-- **Macaque**: 15 cell types
-- **Guinea pig**: 10 cell types
-
-### Soma locations
-
-All 145 cells are localized to the dorsal root ganglion (DRG); 47 are also found in the trigeminal ganglion.
+Every cell type has a stable npokb CURIE identifier (e.g., `npokb:915`). All cross-cell relationships (assertedSubclassOf, mapsTo, relatedCells) are resolved by npokb ID, not by label. The one exception is `ATLAS_TO_CELL`, which maps atlas annotation strings to cell labels.
 
 ### Relationships
 
@@ -44,7 +40,7 @@ Cell types are linked across sources through two relationship types:
 
 ### Per-cell data fields
 
-Each cell type record includes: preferred label, entity ID, species, soma location(s), circuit role, neurotransmitter, Cre line, marker gene expression string, individual marker gene URIs, axon/fiber type phenotype, physiology string, source publication DOI, source data links, alert notes, curator notes, related species variants, asserted subclass-of relationships, maps-to equivalences, and cluster visualization attributes.
+Each cell type record includes: `id` (npokb CURIE), `baseClass` ("neuron" or "cell"), preferred label, entity ID, species, soma location(s), circuit role, neurotransmitter, Cre line, marker gene expression string, individual marker genes (with URIs, expression level, and determinedByMethod), axon/fiber type phenotype (with methods), physiology string (with methods), source publication DOI, source data links, alert notes, curator notes, related species variants (by ID), asserted subclass-of relationships (by ID), maps-to equivalences (by ID), and cluster visualization attributes.
 
 ---
 
@@ -56,7 +52,7 @@ The default view. Displays cell types as expandable cards in a responsive grid. 
 
 **Filter bar** — Filter cards by source, species, soma location, circuit role, and text search. The filter count updates live.
 
-**Detail modal** — Shows full cell information including marker genes (with links to ontology URIs), axon phenotype, physiology, asserted relationships (equivalences and subtypes as clickable buttons that navigate between cells), source publication link, source data links, and curator/alert notes.
+**Detail modal** — Shows full cell information including a base-class badge (neuron/cell), marker genes (with links to ontology URIs, expression level badges, and determinedByMethod badges), axon phenotype (with method badges), physiology (with method badges), asserted relationships (equivalences and subtypes as clickable buttons that navigate between cells by ID), source publication link, source data links, and curator/alert notes.
 
 ### 🌳 Tree View
 
@@ -66,6 +62,8 @@ Organizes cells hierarchically. Choose a grouping mode:
 - **By axon type**: Groups by fiber type (Aβ, Aδ, C fiber, unknown), then families within each type.
 
 Families are collapsible; clicking a family header expands it to show individual variants with their gene expression strings.
+
+A dedicated **Non-neuronal Cells** section groups the 10 non-neuronal cell types by subclass (Glial, Vascular, Stromal, Other).
 
 ### 📊 Synthesis View
 
@@ -78,7 +76,7 @@ A tabular matrix view showing all cell types as rows against phenotypic properti
 
 ### 🔮 Cluster View
 
-A D3 force-directed simulation that positions all 145 cells as colored dots. With no filters active, cells are colored by their source publication. 
+A D3 force-directed simulation that positions neuron cell types as colored dots (non-neuronal cells are excluded). With no filters active, cells are colored by their source publication. 
 
 **Attribute filters** — Select one or more attributes from six categories to recolor cells:
 - **Threshold phenotype**: Cold, Heat, LTM, HTM, Proprioceptive
@@ -86,30 +84,30 @@ A D3 force-directed simulation that positions all 145 cells as colored dots. Wit
 - **Axon phenotype**: Aβ, Aδ, C
 - **Species**: Mouse, Human, Macaque, Guinea Pig
 - **Soma location**: DRG, Trigeminal
-- **Source**: Each of the 7 publications
+- **Source**: Each of the 6 publications
 - **Marker genes**: Individual genes (expandable list)
 
 When one attribute is selected, matching cells are highlighted and the rest are dimmed. When two or more are selected, each attribute gets a distinct color and cells matching all attributes (intersection) glow gold. The legend and statistics panel update dynamically.
 
 Clicking any cell dot opens its detail modal.
 
-### 🌳 Lineage View
+### 🌳 Provisional Mapping (Lineage View)
 
-A 4-column SVG diagram showing cross-source relationships:
+A 4-column SVG diagram showing cross-source relationships for neuron cell types only (non-neuronal cells excluded):
 
 | Column | Content |
 |--------|---------|
-| **Master Cells** | 18 abstract CSA family names (e.g., "DRG Pvalb neuron") |
-| **CSA Species Variants** | 54 CSA paper cells grouped under their family |
-| **Bhuiyan et al., 2025** | 22 big DRG paper cells, positioned by their CSA family connection |
-| **Other Sources** | Tavares-Ferreira, Yu, Krauter, Qi, and Kupari cells connected to big DRG cells |
+| **Master Cells** | 18 abstract Bhuiyan 2024 family names (e.g., "DRG Pvalb neuron") |
+| **Bhuiyan 2024 Variants** | 54 Bhuiyan et al., 2024 cells grouped under their family |
+| **Bhuiyan et al., 2025** | Bhuiyan et al., 2025 neuron cells, positioned by their Bhuiyan 2024 family connection |
+| **Other Sources** | Tavares-Ferreira, Yu, Krauter, and Qi cells connected to Bhuiyan 2025 cells |
 
 **Layout optimization:**
 - Cells in columns 3 and 4 are ordered using barycenter heuristics to minimize line crossings — each cell is positioned at the average Y-coordinate of its connection targets.
-- Cells that connect to big DRG cells in multiple family groups are duplicated into each relevant group to avoid long-distance crossing lines.
+- Cells that connect to Bhuiyan 2025 cells in multiple family groups are duplicated into each relevant group to avoid long-distance crossing lines.
 - Cross-group connections between column 4 cells are rendered as curved arcs on the right edge at lower opacity.
 - Alternating row bands distinguish family groups.
-- Big DRG cells with no direct CSA link (e.g., DRG C-PEP.TAC1 CHRNA3, DRG C-NP.MRGPRX1 MRGPRX4) appear in separate sub-groups at the bottom, each with its own set of related column 4 cells and vertical spacing between sub-groups.
+- Bhuiyan 2025 cells with no direct Bhuiyan 2024 link appear in separate sub-groups at the bottom, each with its own set of related column 4 cells and vertical spacing between sub-groups.
 
 **Line types:**
 - Solid purple: asserted subtype
@@ -118,16 +116,26 @@ A 4-column SVG diagram showing cross-source relationships:
 
 **Interactivity:** Click any cell node to open its detail modal. Hover for a tooltip showing full name and source.
 
+### 📑 Concordance View
+
+A cross-source alignment table showing Bhuiyan et al., 2025 parent cell types with related cells from other sources expandable beneath. Each row shows checkmarks for properties reported by the source publication. Includes export to `.xlsx` and `.docx`.
+
+### 🔗 Align View
+
+A side-by-side comparison view for examining cross-source cell type alignments. Includes export to `.docx`.
+
 ---
 
-## Data Loading
+## Data Pipeline
 
-NervoSensus ships with all 145 cell types embedded directly in the HTML. It can also load external data:
+Cell type data is generated from a source XLSX spreadsheet using `sync_data.py`, which reads the NPO property rows and produces `js/data.js`. The script validates that every cell has an npokb ID, excludes "don't add" rows, classifies cells by base class (neuron vs. cell), deduplicates marker genes by base name, and captures determinedByMethod and expression level metadata.
 
-- **Excel upload** (`.xlsx`): Parses structured cell type spreadsheets using the SheetJS library. Expected columns map to cell type fields (preferred label, entity, species, gene expression, etc.).
+NervoSensus ships with all 153 cell types embedded in `js/data.js`. It can also load external data at runtime:
+
+- **Excel upload** (`.xlsx`): Parses structured cell type spreadsheets using the SheetJS library.
 - **JSON upload**: Accepts a JSON object with `cells` and `genes` arrays matching the internal data schema.
 
-The upload button is in the header. The data status indicator shows whether embedded or uploaded data is active.
+The upload button is in the header. The data status indicator shows whether default or uploaded data is active, with a count of neuron types and non-neuronal cell types.
 
 ---
 
@@ -141,7 +149,14 @@ The upload button is in the header. The data status indicator shows whether embe
 
 ### Architecture
 
-The entire application is a single `index.html` file (~425 KB) with no build step, no server, and no external API calls. All data is embedded as JavaScript constants (`DEFAULT_CELL_TYPES`, `DEFAULT_SOURCES`, `DEFAULT_FAMILIES`). CSS and JavaScript are inline. The app runs entirely client-side in any modern browser.
+The application consists of:
+- `index.html` — page structure and view containers
+- `js/app.js` — all application logic (views, modals, filtering, export)
+- `js/data.js` — generated data constants (`DEFAULT_CELL_TYPES`, `DEFAULT_SOURCES`, `DEFAULT_FAMILIES`, `DEFAULT_GENES`)
+- `css/styles.css` — all styles
+- `sync_data.py` — Python script that reads the source XLSX and generates `js/data.js`
+
+No build step, no server, and no external API calls beyond CDN-loaded libraries. The app runs entirely client-side in any modern browser.
 
 ### Browser compatibility
 

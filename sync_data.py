@@ -64,6 +64,20 @@ def find_xlsx(project_dir):
     return candidates[0]
 
 
+CANONICAL_HEADERS = {
+    'neuron id': 'Neuron ID',
+    'npo property': 'NPO Property',
+    'property value label': 'Property Value Label',
+    'npo property value iri': 'NPO Property Value IRI',
+    'union set number': 'Union set number',
+    'nest intersection number': 'Nest intersection number',
+    'npokb id': 'npokb ID',
+    'proposed action': 'Proposed action',
+    'modifier': 'Modifier',
+    'determinedbymethod': 'determinedByMethod',
+}
+
+
 def read_excel(path):
     """Read the data sheet and return rows as list of dicts."""
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -85,7 +99,8 @@ def read_excel(path):
     headers = None
     for i, row in enumerate(ws.iter_rows(values_only=True)):
         if i == 0:
-            headers = [str(h).strip() if h else '' for h in row]
+            raw = [str(h).strip() if h else '' for h in row]
+            headers = [CANONICAL_HEADERS.get(h.lower(), h) for h in raw]
             continue
         if all(c is None for c in row):
             continue
@@ -108,9 +123,11 @@ def parse_npo_data(rows):
     # ------------------------------------------------------------------
     neurons = {}  # neuron_id -> list of property dicts
     neuron_npokb = {}  # neuron_id -> npokb:Id CURIE
+    neuron_base_class = {}  # neuron_id -> "neuron" or "cell"
     skipped_dont_add = 0
+    errors = []
 
-    for row in rows:
+    for row_num, row in enumerate(rows, start=2):
         neuron_id = safe_str(row.get('Neuron ID'))
         npo_prop = safe_str(row.get('NPO Property'))
         value_label = row.get('Property Value Label')
@@ -119,13 +136,23 @@ def parse_npo_data(rows):
         nest_num = row.get('Nest intersection number')
         npokb_id = safe_str(row.get('npokb ID'))
         proposed_action = safe_str(row.get('Proposed action'))
+        modifier = safe_str(row.get('Modifier'))
+        determined_by = safe_str(row.get('determinedByMethod'))
 
         if not neuron_id:
             continue
 
+        # Validate Proposed action: only blank or "don't add"
+        if proposed_action and proposed_action.lower() != "don't add":
+            errors.append(f"Row {row_num}: unexpected Proposed action '{proposed_action}' (Neuron ID: {neuron_id})")
+
         if proposed_action.lower() == "don't add":
             skipped_dont_add += 1
             continue
+
+        # Validate npokb ID presence
+        if not npokb_id:
+            errors.append(f"Row {row_num}: missing npokb ID (Neuron ID: {neuron_id})")
 
         val = safe_str(value_label)
         iri = safe_str(value_iri)
@@ -136,13 +163,25 @@ def parse_npo_data(rows):
         if neuron_id not in neurons:
             neurons[neuron_id] = []
 
+        # Detect baseClass from NPO Property rows
+        if npo_prop == 'ilxtr:neurondmBaseClass' and val:
+            neuron_base_class[neuron_id] = val.lower()
+
         neurons[neuron_id].append({
             'npo': npo_prop,
             'union': union_num,
             'nest': nest_num,
             'value': val,
             'iri': iri,
+            'modifier': modifier,
+            'determinedBy': determined_by,
         })
+
+    if errors:
+        print(f"\nERROR: {len(errors)} data integrity issue(s) — ingest halted:")
+        for e in errors:
+            print(f"  {e}")
+        sys.exit(1)
 
     print(f"  Rows skipped (don't add): {skipped_dont_add}")
 
@@ -218,10 +257,13 @@ def parse_npo_data(rows):
         sc = source_color_map.get(source_url, {})
         source_color = sc.get('color', '#667eea')
 
+        base_class = neuron_base_class.get(nid, 'neuron')
+
         ct = {
             'id': neuron_npokb.get(nid, ''),
             'entity': '',
             'preferredLabel': '',
+            'baseClass': base_class,
             'species': 'unknown',
             'circuitRole': 'sensory',
             'neurotransmitter': '',
@@ -334,7 +376,12 @@ def parse_npo_data(rows):
                 exp = parts[1] if len(parts) > 1 else ''
                 display = nm + '^' + exp if exp else nm
                 gene_items.append({'union': p['union'], 'nest': p['nest'], 'display': display})
-                ct['markerGenes'].append({'name': nm, 'uri': iri or '', 'expression': exp})
+                gene_entry = {'name': nm, 'uri': iri or '', 'expression': exp}
+                if p['determinedBy']:
+                    gene_entry['determinedBy'] = p['determinedBy']
+                if npo == 'ilxtr:hasNucleicAcidExpressionPhenotype' and p['modifier']:
+                    gene_entry['expressionLevel'] = p['modifier']
+                ct['markerGenes'].append(gene_entry)
                 base = nm.lower()
                 if base not in ct['geneBaseNames']:
                     ct['geneBaseNames'].append(base)
@@ -343,7 +390,10 @@ def parse_npo_data(rows):
                 gene_map[base]['cells'].append(ct['preferredLabel'])
 
             elif npo == 'ilxtr:hasAxonPhenotype' and val:
-                axon_items.append({'union': p['union'], 'nest': p['nest'], 'display': val})
+                item = {'union': p['union'], 'nest': p['nest'], 'display': val}
+                if p['determinedBy']:
+                    item['determinedBy'] = p['determinedBy']
+                axon_items.append(item)
                 vl = val.lower()
                 if 'beta' in vl or '(beta)' in vl:
                     ct['clusterAttributes']['fiber_a_beta'] = True
@@ -354,7 +404,10 @@ def parse_npo_data(rows):
 
             elif npo in ('ilxtr:hasThresholdPhenotype',
                          'ilxtr:hasPredictedThresholdPhenotype') and val:
-                threshold_items.append({'union': p['union'], 'nest': p['nest'], 'display': val})
+                item = {'union': p['union'], 'nest': p['nest'], 'display': val}
+                if p['determinedBy']:
+                    item['determinedBy'] = p['determinedBy']
+                threshold_items.append(item)
                 vl = val.lower()
                 if 'ltm' in vl or 'low-threshold' in vl:
                     ct['clusterAttributes']['mechanosensitive_ltm'] = True
@@ -362,7 +415,10 @@ def parse_npo_data(rows):
                     ct['clusterAttributes']['mechanosensitive_htm'] = True
 
             elif npo == 'ilxtr:hasAdaptationPhenotype' and val:
-                adaptation_items.append({'union': p['union'], 'nest': p['nest'], 'display': val})
+                item = {'union': p['union'], 'nest': p['nest'], 'display': val}
+                if p['determinedBy']:
+                    item['determinedBy'] = p['determinedBy']
+                adaptation_items.append(item)
                 vl = val.lower()
                 if 'rapidly' in vl or '(ra)' in vl:
                     ct['clusterAttributes']['rapidly_adapting'] = True
@@ -370,7 +426,10 @@ def parse_npo_data(rows):
                     ct['clusterAttributes']['slowly_adapting'] = True
 
             elif npo == 'ilxtr:hasFunctionalPhenotype' and val:
-                functional_items.append({'union': p['union'], 'nest': p['nest'], 'display': val})
+                item = {'union': p['union'], 'nest': p['nest'], 'display': val}
+                if p['determinedBy']:
+                    item['determinedBy'] = p['determinedBy']
+                functional_items.append(item)
                 vl = val.lower()
                 if 'cold' in vl:
                     ct['clusterAttributes']['cold_sensitive'] = True
@@ -397,6 +456,11 @@ def parse_npo_data(rows):
         ct['fiberTypeString'] = ' + '.join(a['display'] for a in axon_items)
         ct['fiberTypeStringAbbrev'] = ct['fiberTypeString']
 
+        # Collect determinedByMethod badges for axon phenotype
+        axon_methods = list(dict.fromkeys(a['determinedBy'] for a in axon_items if a.get('determinedBy')))
+        if axon_methods:
+            ct['fiberTypeMethods'] = axon_methods
+
         ct['thresholdString'] = ', '.join(p['display'] for p in threshold_items)
         ct['adaptationString'] = ', '.join(p['display'] for p in adaptation_items)
         ct['functionalString'] = ', '.join(p['display'] for p in functional_items)
@@ -404,8 +468,29 @@ def parse_npo_data(rows):
         ct['physiologyString'] = ' + '.join(p['display'] for p in all_phys)
         ct['physiologyStringAbbrev'] = ct['physiologyString']
 
+        # Collect determinedByMethod badges for physiology
+        phys_methods = list(dict.fromkeys(p['determinedBy'] for p in all_phys if p.get('determinedBy')))
+        if phys_methods:
+            ct['physiologyMethods'] = phys_methods
+
         if ct['somaLocations']:
             ct['somaLocation'] = ct['somaLocations'][0]
+
+        # Deduplicate markerGenes by base name (protein + RNA rows for same gene)
+        seen_genes = {}
+        deduped_genes = []
+        for g in ct['markerGenes']:
+            base = g['name'].lower()
+            if base in seen_genes:
+                existing = seen_genes[base]
+                if g.get('expressionLevel') and not existing.get('expressionLevel'):
+                    existing['expressionLevel'] = g['expressionLevel']
+                if g.get('determinedBy') and not existing.get('determinedBy'):
+                    existing['determinedBy'] = g['determinedBy']
+            else:
+                seen_genes[base] = g
+                deduped_genes.append(g)
+        ct['markerGenes'] = deduped_genes
 
         # Only include cells that have a preferredLabel
         if ct['preferredLabel']:
@@ -527,9 +612,11 @@ def main():
     families, cell_types, genes, source_color_map = parse_npo_data(rows)
 
     # Summary
+    neuron_count = sum(1 for ct in cell_types if ct.get('baseClass', 'neuron') == 'neuron')
+    non_neuron_count = sum(1 for ct in cell_types if ct.get('baseClass', 'neuron') != 'neuron')
     print(f"\n--- Summary ---")
     print(f"  Families:    {len(families)}")
-    print(f"  Cell types:  {len(cell_types)}")
+    print(f"  Cell types:  {len(cell_types)} ({neuron_count} neurons + {non_neuron_count} non-neuronal)")
     print(f"  Genes:       {len(genes)}")
     print(f"  Sources:     {len(source_color_map)}")
     for url, sc in source_color_map.items():

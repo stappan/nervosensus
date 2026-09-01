@@ -23,7 +23,7 @@
             <div class="upload-section">
                 <button class="upload-btn" onclick="showUploadModal()">📁 Load Data</button>
                 <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(event)">
-                <span class="data-status" id="dataStatus">Default data (145 cells)</span>
+                <span class="data-status" id="dataStatus">Default data (143 neuron types + 10 non-neuronal)</span>
                 <button class="feedback-btn" onclick="openFeedback()">💬 Feedback</button>
             </div>
         </div>
@@ -51,13 +51,12 @@
                     <span class="filter-label">Source</span>
                     <select class="filter-select" id="filterSource" onchange="applyCardFilters()">
                         <option value="">All Sources</option>
-                        <option value="CSA paper">CSA paper</option>
-                        <option value="big DRG paper">big DRG paper</option>
+                        <option value="Bhuiyan et al., 2024">Bhuiyan et al., 2024</option>
+                        <option value="Bhuiyan et al., 2025">Bhuiyan et al., 2025</option>
                         <option value="Tavares-Ferreira et al., 2022">Tavares-Ferreira et al., 2022</option>
                         <option value="Yu et al., 2024">Yu et al., 2024</option>
                         <option value="Krauter et al., 2025">Krauter et al., 2025</option>
                         <option value="Qi et al., 2024">Qi et al., 2024</option>
-                        <option value="Kupari et al., 2021">Kupari et al., 2021</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -239,13 +238,12 @@
                             <div class="attr-group-title" onclick="toggleAttrGroup('source')"><span
                                     id="toggle-source">▼</span> Source</div>
                             <div class="attr-group-content expanded" id="attr-group-source"><button class="attr-btn"
-                                    data-attr="source_0">CSA paper</button><button class="attr-btn"
-                                    data-attr="source_1">big DRG paper</button><button class="attr-btn"
+                                    data-attr="source_0">Bhuiyan et al., 2024</button><button class="attr-btn"
+                                    data-attr="source_1">Bhuiyan et al., 2025</button><button class="attr-btn"
                                     data-attr="source_2">Tavares-Ferreira et al., 2022</button><button class="attr-btn"
                                     data-attr="source_3">Yu et al., 2024</button><button class="attr-btn"
                                     data-attr="source_4">Krauter et al., 2025</button><button class="attr-btn"
-                                    data-attr="source_5">Qi et al., 2024</button><button class="attr-btn"
-                                    data-attr="source_6">Kupari et al., 2021</button></div>
+                                    data-attr="source_5">Qi et al., 2024</button></div>
                         </div>
                         <div class="attr-group">
                             <div class="attr-group-title" onclick="toggleAttrGroup('genes')"><span
@@ -280,12 +278,12 @@
                         <div class="lineage-legend-item">
                             <div
                                 style="width:14px;height:14px;border:2px solid #667eea;border-radius:3px;background:white;">
-                            </div> CSA paper
+                            </div> Bhuiyan et al., 2024
                         </div>
                         <div class="lineage-legend-item">
                             <div
                                 style="width:14px;height:14px;border:2px solid #f59e0b;border-radius:3px;background:white;">
-                            </div> big DRG paper
+                            </div> Bhuiyan et al., 2025
                         </div>
                         <div class="lineage-legend-item">
                             <div
@@ -306,11 +304,6 @@
                             <div
                                 style="width:14px;height:14px;border:2px solid #06b6d4;border-radius:3px;background:white;">
                             </div> Qi et al.
-                        </div>
-                        <div class="lineage-legend-item">
-                            <div
-                                style="width:14px;height:14px;border:2px solid #ec4899;border-radius:3px;background:white;">
-                            </div> Kupari et al.
                         </div>
                         <div style="display:flex;align-items:center;justify-content:space-between;"><button
                                 class="permalink-btn" onclick="copyLineageLink()">🔗 Copy Link</button></div>

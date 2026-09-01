@@ -2,9 +2,9 @@ let SOURCES = JSON.parse(JSON.stringify(DEFAULT_SOURCES));
 
 let CELL_TYPES = JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES));
 
-// Helper to check if a cell is a master cell (CSA paper with no species)
+// Helper to check if a cell is a master cell (Bhuiyan 2024 / CSA paper with no species)
 function isMasterCell(ct) {
-    if (ct.sourceNomenclatureLabel !== 'CSA paper') return false;
+    if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2024') return false;
     const label = ct.preferredLabel.toLowerCase();
     return !label.includes('mouse') && !label.includes('human') && 
            !label.includes('macaque') && !label.includes('guinea');
@@ -35,13 +35,13 @@ let clusterWidth = 0, clusterHeight = 0;
 let clusterNodeSelection = null;
 
 // Species labels used instead of icons
-const ATTR_LABELS = { source_0:'CSA paper', source_1:'big DRG paper', source_2:'Tavares-Ferreira et al., 2022', source_3:'Yu et al., 2024', source_4:'Krauter et al., 2025', source_5:'Qi et al., 2024', source_6:'Kupari et al., 2021',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprioceptive', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'Guinea Pig', soma_drg:'DRG', soma_tg:'Trigeminal' };
-const ATTR_SHORT = { source_0:'CSA paper', source_1:'big DRG paper', source_2:'Tavares-Ferreira 2022', source_3:'Yu 2024', source_4:'Krauter 2025', source_5:'Qi 2024', source_6:'Kupari 2021',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprio', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'G.Pig', soma_drg:'DRG', soma_tg:'TG' };
-const SOURCE_URLS = {"source_0": "https://doi.org/10.1126/sciadv.adj9173", "source_1": "https://doi.org/10.1101/2025.11.05.686654", "source_2": "https://doi.org/10.1126/scitranslmed.abj8186", "source_3": "https://doi.org/10.1038/s41593-024-01794-1", "source_4": "https://doi.org/10.1038/s42003-025-08315-1", "source_5": "https://doi.org/10.1016/j.cell.2024.02.006", "source_6": "https://doi.org/10.1038/s41467-021-21725-z"};
+const ATTR_LABELS = { source_0:'Bhuiyan et al., 2024', source_1:'Bhuiyan et al., 2025', source_2:'Tavares-Ferreira et al., 2022', source_3:'Yu et al., 2024', source_4:'Krauter et al., 2025', source_5:'Qi et al., 2024',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprioceptive', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'Guinea Pig', soma_drg:'DRG', soma_tg:'Trigeminal' };
+const ATTR_SHORT = { source_0:'Bhuiyan 2024', source_1:'Bhuiyan 2025', source_2:'Tavares-Ferreira 2022', source_3:'Yu 2024', source_4:'Krauter 2025', source_5:'Qi 2024',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprio', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'G.Pig', soma_drg:'DRG', soma_tg:'TG' };
+const SOURCE_URLS = {"source_0": "https://doi.org/10.1126/sciadv.adj9173", "source_1": "https://doi.org/10.1101/2025.11.05.686654", "source_2": "https://doi.org/10.1126/scitranslmed.abj8186", "source_3": "https://doi.org/10.1038/s41593-024-01794-1", "source_4": "https://doi.org/10.1038/s42003-025-08315-1", "source_5": "https://doi.org/10.1016/j.cell.2024.02.006"};
 const PRECISION_BASE_URL = 'https://sparc.science/apps/precision-dashboard';
 const PRECISION_GENES = new Set(["ADORA2B", "ADRA2A", "ADRA2C", "AGT", "ALDH1A1", "ASIC1", "ATF3", "AVPR1A", "BMPR1B", "CACNA1I", "CACNG5", "CALB1", "CALCA", "CASQ2", "CCK", "CCKAR", "CDH9", "CHRNA3", "CHRNA7", "CPNE6", "CUX2", "DCN", "EPHA3", "ETV1", "FOXP2", "GFRA1", "GFRA2", "GFRA3", "GPR68", "GRM8", "GRXCR2", "HAPLN4", "HRH1", "IL31RA", "IL3RA", "KCNS1", "KIT", "LGI2", "MRGPRD", "MRGPRX1", "MRGPRX4", "NGEF", "NPPB", "NSG2", "NTRK2", "NTRK3", "OPRD1", "OPRK1", "OPRM1", "PCDH8", "PENK", "PIEZO2", "PNOC", "PROKR2", "PTGIR", "PTPRT", "PVALB", "REEP5", "RXFP1", "S100A16", "S100A4", "SCGN", "SCN10A", "SCN11A", "SLC18A3", "SST", "SSTR2", "STUM", "SYT17", "TAC1", "TAC3", "TH", "TRPA1", "TRPM2", "TRPM8", "TRPV1"]);
-// Atlas annotation → big DRG paper cell preferredLabel (from ilxtr:atlasAnnotation in PRECISIONcelltypeNPO.xlsx,
-// keyed by Column A Neuron ID, filtered to ilxtr:literatureCitation = "big DRG paper" only)
+// Atlas annotation → Bhuiyan 2025 cell preferredLabel (from ilxtr:atlasAnnotation in PRECISIONcelltypeNPO.xlsx,
+// keyed by Column A Neuron ID, filtered to ilxtr:literatureCitation = "Bhuiyan et al., 2025" only)
 const ATLAS_TO_CELL = {
     "A-LTMR.TAC3": "DRG A-LTMR.TAC3 human neuron",
     "A-PEP.CHRNA7/SLC18A3": "DRG A-PEP.CHRNA7 SLC18A3 human neuron",
@@ -451,7 +451,8 @@ function initGeneButtons() {
     });
 }
 
-function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); ID_INDEX=buildIdIndex(); closeUploadModal(); selectedAttributes=[]; renderSourcesFooter(); renderCards(); }
+function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); ID_INDEX=buildIdIndex(); closeUploadModal(); selectedAttributes=[]; renderSourcesFooter(); updateDataStatus(); renderCards(); }
+function updateDataStatus() { const nn=CELL_TYPES.filter(ct=>(ct.baseClass||'neuron')!=='neuron').length; const n=CELL_TYPES.length-nn; document.getElementById('dataStatus').textContent=`Default data (${n} neuron types + ${nn} non-neuronal)`; }
 const VIEW_NAMES = { cards: 'Card View', tree: 'Tree View', synthesis: 'Synthesis View', cluster: 'Cluster View', lineage: 'Provisional Mapping', compare: 'Compare', align: 'Align View', concordance: 'Concordance' };
 function openFeedback() { const name = VIEW_NAMES[currentView] || currentView; window.open('nervosensus-feedback.html?view=' + encodeURIComponent(name), '_blank'); }
 function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cellDetailViewContainer').style.display='none'; document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; document.getElementById('alignViewContainer').style.display=view==='align'?'block':'none'; document.getElementById('concordanceViewContainer').style.display=view==='concordance'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); if(view==='align')renderAlignView(); if(view==='concordance')renderConcordanceView(); if(location.hash.startsWith('#cell/'))history.replaceState(null,'',location.pathname+location.search); }
@@ -491,7 +492,7 @@ function applyCardFilters() {
     const geneFilter = document.getElementById('filterGene').value;
     const equivFilter = document.getElementById('filterEquiv').value;
     
-    const SOURCE_ORDER = ['big DRG paper'];
+    const SOURCE_ORDER = ['Bhuiyan et al., 2025'];
     const filtered = CELL_TYPES.filter((ct, idx) => {
         if (sourceFilter && ct.sourceNomenclatureLabel !== sourceFilter) return false;
         if (speciesFilter && ct.species.toLowerCase() !== speciesFilter.toLowerCase()) return false;
@@ -542,7 +543,7 @@ function applyCardFilters() {
                     ${ct.geneExpressionString ? `<div class="card-section"><div class="section-title">🧬 Marker Genes</div><div class="gene-display">${formatGeneExpression(ct.geneExpressionString)}</div></div>` : ''}
                     ${ct.fiberTypeString ? `<div class="card-section"><div class="section-title">🔬 Axon Phenotype</div><div class="gene-display">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>` : ''}
                     ${ct.physiologyString ? `<div class="card-section"><div class="section-title">⚡ Physiology</div><div class="gene-display">${formatGeneExpression(ct.physiologyString)}</div></div>` : ''}
-                    ${ct.relatedCells && ct.relatedCells.length > 0 ? `<div class="card-section"><div class="section-title">🔗 Related Variants</div><div class="related-cells">${ct.relatedCells.map(rc => `<button class="related-cell-btn" onclick="event.stopPropagation();${rc.id ? `openCellById('${rc.id}')` : `showModalByName('${rc.label.replace(/'/g, "\\'")}')`}">${rc.label}</button>`).join('')}</div></div>` : ''}
+                    ${ct.relatedCells && ct.relatedCells.length > 0 ? `<div class="card-section"><div class="section-title">🔗 Related Variants</div><div class="related-cells">${ct.relatedCells.map(rc => `<button class="related-cell-btn" onclick="event.stopPropagation();openCellById('${rc.id}')">${rc.label}</button>`).join('')}</div></div>` : ''}
                     ${(() => {
                         const rels = getAssertedRelationships(idx);
                         if (rels.equivalences.length === 0 && rels.subtypeOf.length === 0 && rels.hasSubtypes.length === 0) return '';
@@ -621,8 +622,8 @@ function renderTreeView() {
             fam.children.forEach(ch => {
                 const childId = ch.id || '';
                 const childLabel = ch.label || ch;
-                const ct = childId ? CELL_TYPES[ID_INDEX[childId]] : CELL_TYPES.find(x => x.preferredLabel === childLabel);
-                const onclick = childId ? "openCellById('" + childId + "')" : "showModalByName('" + childLabel.replace(/'/g, "\\'") + "')";
+                const ct = childId ? CELL_TYPES[ID_INDEX[childId]] : undefined;
+                const onclick = childId ? "openCellById('" + childId + "')" : "";
                 famHtml += '<div class="tree-child" onclick="' + onclick + '"><div class="tree-child-name">' + childLabel + '</div>' + (ct ? '<div class="tree-child-species">🧬 ' + (ct.geneExpressionString ? formatGeneExpression(ct.geneExpressionString) : 'No marker genes') + '</div>' : '') + '</div>';
             });
             famHtml += '</div></div>';
@@ -630,9 +631,12 @@ function renderTreeView() {
         return famHtml;
     }
     
+    const neuronTypes = CELL_TYPES.filter(ct => (ct.baseClass || 'neuron') === 'neuron');
+    const nonNeuronTypes = CELL_TYPES.filter(ct => (ct.baseClass || 'neuron') !== 'neuron');
+
     if (treeGrouping === 'location') {
         let groups = {};
-        CELL_TYPES.forEach(ct => {
+        neuronTypes.forEach(ct => {
             (ct.somaLocations || [ct.somaLocation || 'Unknown']).forEach(loc => {
                 if (!groups[loc]) groups[loc] = [];
                 if (!groups[loc].find(x => x.preferredLabel === ct.preferredLabel)) groups[loc].push(ct);
@@ -653,7 +657,7 @@ function renderTreeView() {
         const cFiberCells = [];
         const unknownCells = [];
         
-        CELL_TYPES.forEach(ct => {
+        neuronTypes.forEach(ct => {
             const fts = (ct.fiberTypeString || '').toLowerCase();
             const attrs = ct.clusterAttributes || {};
             
@@ -722,7 +726,37 @@ function renderTreeView() {
             gi++;
         }
     }
-    
+
+    // Non-neuronal cells section
+    if (nonNeuronTypes.length > 0) {
+        const NON_NEURON_SUBCLASS = {
+            'satellite glial': 'Glial', 'schwann': 'Glial',
+            'endothelial': 'Vascular', 'mural': 'Vascular',
+            'fibroblast': 'Stromal',
+        };
+        const subgroups = {};
+        nonNeuronTypes.forEach(ct => {
+            const lbl = ct.preferredLabel.toLowerCase();
+            let sub = 'Other';
+            for (const [key, val] of Object.entries(NON_NEURON_SUBCLASS)) {
+                if (lbl.includes(key)) { sub = val; break; }
+            }
+            if (!subgroups[sub]) subgroups[sub] = [];
+            subgroups[sub].push(ct);
+        });
+        html += '<div class="tree-soma-group non-neuronal-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">🔬</span><span class="tree-soma-name">Non-neuronal Cells</span><span class="tree-soma-count">' + nonNeuronTypes.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
+        Object.entries(subgroups).forEach(([subName, cells], si) => {
+            const uid = gi + '-nn-' + si;
+            html += '<div class="tree-item"><div class="tree-master" onclick="toggleFamily(\'' + uid + '\')"><span class="tree-toggle" id="toggle-' + uid + '">▶</span><div style="display:inline-block;vertical-align:top;"><div class="tree-master-name">' + subName + '</div><div class="tree-master-count">' + cells.length + ' cells</div></div></div><div class="tree-children" id="children-' + uid + '">';
+            cells.forEach(ct => {
+                html += '<div class="tree-child" onclick="openCellById(\'' + ct.id + '\')"><div class="tree-child-name">' + ct.preferredLabel + '</div></div>';
+            });
+            html += '</div></div>';
+        });
+        html += '</div></div>';
+        gi++;
+    }
+
     c.innerHTML = html;
 }
 function toggleSomaGroup(i){document.getElementById(`soma-children-${i}`).classList.toggle('expanded');document.getElementById(`soma-toggle-${i}`).classList.toggle('expanded');}
@@ -1024,7 +1058,7 @@ function renderAlignView() {
     // Find Big DRG paper cells
     const bigDrgCells = [];
     CELL_TYPES.forEach((ct, idx) => {
-        if (ct.sourceNomenclatureLabel === 'big DRG paper') {
+        if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025') {
             bigDrgCells.push({ ...ct, origIdx: idx });
         }
     });
@@ -1038,7 +1072,7 @@ function renderAlignView() {
         const children = [];
         const allRelated = [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes];
         allRelated.forEach(r => {
-            if (r.idx !== parentCt.origIdx && CELL_TYPES[r.idx].sourceNomenclatureLabel !== 'big DRG paper') {
+            if (r.idx !== parentCt.origIdx && CELL_TYPES[r.idx].sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') {
                 if (!children.find(c => c.origIdx === r.idx)) {
                     children.push({ ...CELL_TYPES[r.idx], origIdx: r.idx });
                     usedChildIdxs.add(r.idx);
@@ -1201,13 +1235,12 @@ function toggleAlignAll() {
 let concordanceInitialized = false;
 
 const CONCORDANCE_SOURCE_SHORT = {
-    'big DRG paper': 'Big DRG',
-    'CSA paper': 'CSA',
+    'Bhuiyan et al., 2024': 'Bhuiyan 2024',
+    'Bhuiyan et al., 2025': 'Bhuiyan 2025',
     'Krauter et al., 2025': 'Krauter 2025',
     'Qi et al., 2024': 'Qi 2024',
     'Yu et al., 2024': 'Yu 2024',
     'Tavares-Ferreira et al., 2022': 'Tavares-F. 2022',
-    'Kupari et al., 2021': 'Kupari 2021',
 };
 
 function getConcordanceSources() {
@@ -1238,8 +1271,8 @@ function renderConcordanceView(anchorPreset, comparePreset) {
         ).join('');
         if (anchorPreset && allSources.includes(anchorPreset)) {
             anchorSelect.value = anchorPreset;
-        } else if (allSources.includes('big DRG paper')) {
-            anchorSelect.value = 'big DRG paper';
+        } else if (allSources.includes('Bhuiyan et al., 2025')) {
+            anchorSelect.value = 'Bhuiyan et al., 2025';
         }
 
         anchorSelect.addEventListener('change', () => {
@@ -1649,7 +1682,7 @@ function togglePinnedRow(idx) {
 function highlightEquivPair(idx) { highlightRelationships(idx); }
 function clearEquivHighlight() { clearRelationshipHighlights(); }
 
-function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,idx:i,id:i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
+function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); const neuronCells=CELL_TYPES.map((ct,i)=>({ct,i})).filter(x=>(x.ct.baseClass||'neuron')==='neuron'); clusterNodes=neuronCells.map(x=>({...x.ct,idx:x.i,id:x.i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
 
 function clearAllFilters() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); updateClusterLegend(); updateClusterStats(); updateClusterVisualization(); }
 function updateSelectedDisplay() { const display=document.getElementById('selectedAttrsDisplay'); if(selectedAttributes.length===0){display.textContent='No attributes selected';}else{const labels=selectedAttributes.map(a=>{if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);return gene?gene.display:a;}return ATTR_LABELS[a]||a;});display.textContent=`Selected (${labels.length}): ${labels.join(', ')}`;} }
@@ -1920,13 +1953,12 @@ function renderLineageView() {
     svg.selectAll('*').remove();
     
     const sourceColors = {
-        'CSA paper': '#667eea',
-        'big DRG paper': '#f59e0b',
+        'Bhuiyan et al., 2024': '#667eea',
+        'Bhuiyan et al., 2025': '#f59e0b',
         'Tavares-Ferreira et al., 2022': '#22c55e',
         'Yu et al., 2024': '#ef4444',
         'Krauter et al., 2025': '#8b5cf6',
         'Qi et al., 2024': '#06b6d4',
-        'Kupari et al., 2021': '#ec4899'
     };
     
     const LINE_COLORS = {
@@ -1936,13 +1968,8 @@ function renderLineageView() {
     };
     
     // --- Helpers ---
-    const labelToIdx = {};
-    CELL_TYPES.forEach((ct, idx) => {
-        labelToIdx[ct.preferredLabel] = idx;
-    });
     function resolveRef(rel) {
         if (rel.id && ID_INDEX[rel.id] !== undefined) return ID_INDEX[rel.id];
-        if (rel.label && labelToIdx[rel.label] !== undefined) return labelToIdx[rel.label];
         return null;
     }
 
@@ -1974,9 +2001,13 @@ function renderLineageView() {
         return { color: LINE_COLORS.subtype, dashed: false, double: false };
     }
     
-    // --- Categorise ---
+    // --- Categorise (exclude non-neuronal cells from lineage) ---
+    const isNeuron = ct => (ct.baseClass || 'neuron') === 'neuron';
     const masterFamilies = FAMILIES.map(fam => ({
-        name: fam.name, children: fam.children || []
+        name: fam.name, children: (fam.children || []).filter(ch => {
+            const idx = ch.id ? ID_INDEX[ch.id] : undefined;
+            return idx !== undefined && isNeuron(CELL_TYPES[idx]);
+        })
     }));
     masterFamilies.sort((a, b) => a.name.localeCompare(b.name));
     
@@ -1986,8 +2017,7 @@ function renderLineageView() {
         csaByFamily[fam.name] = [];
         fam.children.forEach(child => {
             const childId = child.id || '';
-            const childLabel = child.label || child;
-            const idx = childId ? ID_INDEX[childId] : labelToIdx[childLabel];
+            const idx = childId ? ID_INDEX[childId] : undefined;
             if (idx !== undefined) {
                 csaByFamily[fam.name].push({ idx, ct: CELL_TYPES[idx] });
                 csaToFamily[idx] = fam.name;
@@ -1996,16 +2026,16 @@ function renderLineageView() {
     });
     
     const col3Sources = new Set(['Tavares-Ferreira et al., 2022', 'Yu et al., 2024',
-        'Krauter et al., 2025', 'Qi et al., 2024', 'Kupari et al., 2021']);
+        'Krauter et al., 2025', 'Qi et al., 2024']);
     
     // Build bigDRG → family mapping
     const bigDrgFamily = {};
     const bigDrgCsaConns = {};
     const bigDrgCol3Conns = {};
     CELL_TYPES.forEach((ct, idx) => {
-        if (ct.sourceNomenclatureLabel !== 'big DRG paper') return;
+        if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') return;
         const conns = getResolvedConnections(ct);
-        const csaConns = conns.filter(c => CELL_TYPES[c.targetIdx].sourceNomenclatureLabel === 'CSA paper');
+        const csaConns = conns.filter(c => CELL_TYPES[c.targetIdx].sourceNomenclatureLabel === 'Bhuiyan et al., 2024');
         const c3Conns = conns.filter(c => col3Sources.has(CELL_TYPES[c.targetIdx].sourceNomenclatureLabel));
         bigDrgCsaConns[idx] = csaConns;
         bigDrgCol3Conns[idx] = c3Conns;
@@ -2023,14 +2053,14 @@ function renderLineageView() {
         if (!col3Sources.has(ct.sourceNomenclatureLabel)) return;
         const conns = getResolvedConnections(ct);
         col3ToBigDrg[idx] = conns.filter(c =>
-            CELL_TYPES[c.targetIdx].sourceNomenclatureLabel === 'big DRG paper');
+            CELL_TYPES[c.targetIdx].sourceNomenclatureLabel === 'Bhuiyan et al., 2025');
         col3ToCol3[idx] = conns.filter(c =>
             col3Sources.has(CELL_TYPES[c.targetIdx].sourceNomenclatureLabel) && c.targetIdx !== idx);
     });
     
     // Also: bigDRG→col3 reversed into col3→bigDRG
     CELL_TYPES.forEach((ct, idx) => {
-        if (ct.sourceNomenclatureLabel !== 'big DRG paper') return;
+        if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') return;
         (bigDrgCol3Conns[idx] || []).forEach(c => {
             if (!col3ToBigDrg[c.targetIdx]) col3ToBigDrg[c.targetIdx] = [];
             if (!col3ToBigDrg[c.targetIdx].find(x => x.targetIdx === idx))
@@ -2083,7 +2113,7 @@ function renderLineageView() {
         // --- Collect bigDRG in this family ---
         const groupBigDrg = [];
         CELL_TYPES.forEach((ct, idx) => {
-            if (ct.sourceNomenclatureLabel !== 'big DRG paper') return;
+            if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') return;
             if (bigDrgFamily[idx] !== fam.name) return;
             groupBigDrg.push({ idx, ct, csaConns: bigDrgCsaConns[idx] || [] });
         });
@@ -2285,17 +2315,17 @@ function renderLineageView() {
     
     // --- Unplaced bigDRG (no CSA family link, e.g., cells 67, 71) ---
     const placedBigDrg = new Set(Object.keys(positions).filter(k => !k.includes('_')).map(Number)
-        .filter(idx => CELL_TYPES[idx]?.sourceNomenclatureLabel === 'big DRG paper'));
+        .filter(idx => CELL_TYPES[idx]?.sourceNomenclatureLabel === 'Bhuiyan et al., 2025'));
     const unplacedBigDrg = [];
     CELL_TYPES.forEach((ct, idx) => {
-        if (ct.sourceNomenclatureLabel === 'big DRG paper' && !placedBigDrg.has(idx))
+        if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025' && !placedBigDrg.has(idx))
             unplacedBigDrg.push({ idx, ct });
     });
     
     if (unplacedBigDrg.length > 0) {
         currentY += 16;
         connections.push({ _label: true, x: col2X, y: currentY - 6, 
-            text: 'No direct CSA link (' + unplacedBigDrg.length + ')' });
+            text: 'No direct Bhuiyan 2024 link (' + unplacedBigDrg.length + ')' });
         currentY += 4;
         
         // Treat each unplaced bigDRG as its own sub-group
@@ -2448,7 +2478,7 @@ function renderLineageView() {
     // Column headers
     const columns = [
         { x: col0X, width: col0Width, title: 'Master Cells', color: '#667eea' },
-        { x: col1X, width: col1Width, title: 'CSA Species Variants', color: '#667eea' },
+        { x: col1X, width: col1Width, title: 'Bhuiyan 2024 Variants', color: '#667eea' },
         { x: col2X, width: col2Width, title: 'Bhuiyan et al., 2025', color: '#f59e0b' },
         { x: col3X, width: col3Width, title: 'Other Sources', color: '#6b7280' }
     ];
@@ -2614,10 +2644,10 @@ function buildCellDetailHTML(idx, useLinks) {
     if(ct.relatedCells&&ct.relatedCells.length>0){
         const relButtons = ct.relatedCells.map(rc => {
             if (useLinks) {
-                const ri = rc.id ? (ID_INDEX[rc.id] ?? -1) : CELL_TYPES.findIndex(x => x.preferredLabel === rc.label);
+                const ri = rc.id ? (ID_INDEX[rc.id] ?? -1) : -1;
                 return ri !== -1 ? `<a href="#cell/${CELL_TYPES[ri].id}" class="related-cell-btn" onclick="event.stopPropagation();">${rc.label}</a>` : `<span class="related-cell-btn">${rc.label}</span>`;
             }
-            return `<button class="related-cell-btn" onclick="${rc.id ? `openCellById('${rc.id}')` : `showModalByName('${rc.label.replace(/'/g,"\\'")}')`}">${rc.label}</button>`;
+            return `<button class="related-cell-btn" onclick="openCellById('${rc.id}')">${rc.label}</button>`;
         }).join('');
         relatedHtml=`<div class="detail-section"><h3>🔗 Related Species Variants</h3><div class="related-cells">${relButtons}</div></div>`;
     }
@@ -2656,7 +2686,7 @@ function buildCellDetailHTML(idx, useLinks) {
     const sourceLinkHtml='';
     const sourceDataHtml = ct.sourceData && ct.sourceData.length > 0 ? `<div class="detail-section"><h3>📊 Source Data</h3>${ct.sourceData.map(sd => `<a href="${sd.uri}" target="_blank" class="source-link">${sd.label} ↗</a>`).join('<br>')}</div>` : '';
     let precisionHtml = '';
-    if (ct.sourceNomenclatureLabel === 'big DRG paper' && ct.markerGenes && ct.markerGenes.length > 0) {
+    if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025' && ct.markerGenes && ct.markerGenes.length > 0) {
         const seenGenes = new Set();
         const precisionMarkers = [];
         for (const g of ct.markerGenes) {
@@ -2676,7 +2706,7 @@ function buildCellDetailHTML(idx, useLinks) {
         }
     }
     const notesHtml = (ct.alertNotes && ct.alertNotes.length > 0) || (ct.curatorNotes && ct.curatorNotes.length > 0) ? `<div class="detail-section"><h3>📝 Notes</h3><div style="padding:0.5rem 0.75rem;background:#fef9c3;border:1px solid #eab308;border-radius:6px;font-size:0.9rem;line-height:1.5;">${ct.alertNotes && ct.alertNotes.length > 0 ? `<div style="margin-bottom:${ct.curatorNotes && ct.curatorNotes.length > 0 ? '1rem' : '0'};"><strong style="color:#b45309;">⚠️ Alert Notes:</strong>${ct.alertNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}${ct.curatorNotes && ct.curatorNotes.length > 0 ? `<div><strong style="color:#1e40af;">📋 Curator Notes:</strong>${ct.curatorNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}</div></div>` : '';
-    return `<div class="detail-section"><p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
+    return `<div class="detail-section"><p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''}${g.expressionLevel?`<span class="method-badge expr-level">${g.expressionLevel}</span>`:''}${g.determinedBy?`<span class="method-badge">${g.determinedBy}</span>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype${ct.fiberTypeMethods?ct.fiberTypeMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology${ct.physiologyMethods?ct.physiologyMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
 }
 
 function buildRelatedSourceCellsHTML(idx) {
@@ -2701,7 +2731,7 @@ function renderCellDetailView(idx) {
     document.getElementById('cellDetailContent').innerHTML =
         `<div class="cell-detail-page">` +
             `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
-            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id">${ct.id||''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${buildSourceLine(ct)}</div>` +
+            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id">${ct.id||''}${(ct.baseClass||'neuron')!=='neuron'?'<span class="base-class-badge">Non-neuronal</span>':''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${buildSourceLine(ct)}</div>` +
             `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
             buildRelatedSourceCellsHTML(idx) +
         `</div>`;
@@ -2744,7 +2774,6 @@ function showModal(idx) {
     document.getElementById('modalBody').innerHTML = buildCellDetailHTML(idx, false);
     document.getElementById('modal').classList.add('show');
 }
-function showModalByName(name) { const idx=CELL_TYPES.findIndex(ct=>ct.preferredLabel===name); if(idx!==-1)showModal(idx); }
 function openCellById(id) { const idx=ID_INDEX[id]; if(idx!==undefined)showModal(idx); }
 function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
@@ -2989,7 +3018,7 @@ async function exportAlignDocx() {
         // Build align data (same logic as renderAlignView)
         const bigDrgCells = [];
         CELL_TYPES.forEach((ct, idx) => {
-            if (ct.sourceNomenclatureLabel === 'big DRG paper')
+            if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025')
                 bigDrgCells.push({ ...ct, origIdx: idx });
         });
 
@@ -2998,7 +3027,7 @@ async function exportAlignDocx() {
             const rels = getAssertedRelationships(parentCt.origIdx);
             const children = [];
             [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes].forEach(r => {
-                if (r.idx !== parentCt.origIdx && CELL_TYPES[r.idx].sourceNomenclatureLabel !== 'big DRG paper') {
+                if (r.idx !== parentCt.origIdx && CELL_TYPES[r.idx].sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') {
                     if (!children.find(c => c.origIdx === r.idx))
                         children.push({ ...CELL_TYPES[r.idx], origIdx: r.idx });
                 }
@@ -3533,8 +3562,8 @@ function renderCompareView(anchorPreset, comparePreset) {
         anchorSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
         if (anchorPreset && sources.includes(anchorPreset)) {
             anchorSelect.value = anchorPreset;
-        } else if (sources.includes('big DRG paper')) {
-            anchorSelect.value = 'big DRG paper';
+        } else if (sources.includes('Bhuiyan et al., 2025')) {
+            anchorSelect.value = 'Bhuiyan et al., 2025';
         }
         anchorSelect.addEventListener('change', () => {
             // Clear compare selectors and rebuild
@@ -3588,7 +3617,7 @@ function renderSourcesFooter() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('dataStatus').textContent = `Default data (${CELL_TYPES.length} cells)`;
+    updateDataStatus();
     renderSourcesFooter();
     renderCards();
     initGeneButtons();
@@ -3710,14 +3739,14 @@ document.addEventListener('DOMContentLoaded', () => {
             applyCardFilters();
         }
 
-        // Open a specific cell modal by ID, preferred label, or atlas annotation
+        // Open a specific cell modal by ID or atlas annotation
         if (cell) {
             if (ID_INDEX[cell] !== undefined) openCellById(cell);
-            else showModalByName(cell);
         } else if (atlasAnnotation) {
             const cellName = ATLAS_TO_CELL[atlasAnnotation];
             if (cellName) {
-                showModalByName(cellName);
+                const aidx = CELL_TYPES.findIndex(ct => ct.preferredLabel === cellName);
+                if (aidx !== -1) showModal(aidx);
             }
         }
     } else {

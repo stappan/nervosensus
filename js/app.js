@@ -486,15 +486,17 @@ function populateFilterDropdowns() {
 
 function applyCardFilters() {
     const sourceFilter = document.getElementById('filterSource').value;
+    const baseClassFilter = document.getElementById('filterBaseClass').value;
     const speciesFilter = document.getElementById('filterSpecies').value;
     const axonFilter = document.getElementById('filterAxon').value;
     const locationFilter = document.getElementById('filterLocation').value;
     const geneFilter = document.getElementById('filterGene').value;
     const equivFilter = document.getElementById('filterEquiv').value;
-    
+
     const SOURCE_ORDER = ['Bhuiyan et al., 2025'];
     const filtered = CELL_TYPES.filter((ct, idx) => {
         if (sourceFilter && ct.sourceNomenclatureLabel !== sourceFilter) return false;
+        if (baseClassFilter && (ct.baseClass || 'neuron') !== baseClassFilter) return false;
         if (speciesFilter && ct.species.toLowerCase() !== speciesFilter.toLowerCase()) return false;
         if (axonFilter && !ct.clusterAttributes[axonFilter]) return false;
         if (locationFilter && !ct.clusterAttributes[locationFilter]) return false;
@@ -532,7 +534,7 @@ function applyCardFilters() {
                 <div class="card-compact-info">
                     <div class="card-npokb-id">${ct.id||''}</div>
                     <div class="card-compact-name">${ct.preferredLabel}</div>
-                    <div class="card-compact-meta">${ct.species} • ${(ct.somaLocations||[]).join(', ') || 'Unknown location'}</div>
+                    <div class="card-compact-meta">${ct.species} • ${(ct.somaLocations||[]).join(', ') || 'Unknown location'}${ct.subClassOf&&ct.subClassOf.length ? ' • ' + ct.subClassOf.join(', ') : ''}</div>
                     ${buildSourceLine(ct)}
                 </div>
                 <div class="card-compact-badges">${axonBadge}${equivBadge}${subtypeBadge}</div>
@@ -583,6 +585,7 @@ function toggleCardExpand(idx) {
 
 function clearCardFilters() {
     document.getElementById('filterSource').value = '';
+    document.getElementById('filterBaseClass').value = '';
     document.getElementById('filterSpecies').value = '';
     document.getElementById('filterAxon').value = '';
     document.getElementById('filterLocation').value = '';
@@ -727,22 +730,14 @@ function renderTreeView() {
         }
     }
 
-    // Non-neuronal cells section
+    // Non-neuronal cells section — group by ilxtr:subClassOf data
     if (nonNeuronTypes.length > 0) {
-        const NON_NEURON_SUBCLASS = {
-            'satellite glial': 'Glial', 'schwann': 'Glial',
-            'endothelial': 'Vascular', 'mural': 'Vascular',
-            'fibroblast': 'Stromal',
-        };
         const subgroups = {};
         nonNeuronTypes.forEach(ct => {
-            const lbl = ct.preferredLabel.toLowerCase();
-            let sub = 'Other';
-            for (const [key, val] of Object.entries(NON_NEURON_SUBCLASS)) {
-                if (lbl.includes(key)) { sub = val; break; }
-            }
-            if (!subgroups[sub]) subgroups[sub] = [];
-            subgroups[sub].push(ct);
+            const subs = ct.subClassOf || [];
+            const groupLabel = subs.length > 0 ? subs[subs.length - 1] : 'Other';
+            if (!subgroups[groupLabel]) subgroups[groupLabel] = [];
+            subgroups[groupLabel].push(ct);
         });
         html += '<div class="tree-soma-group non-neuronal-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">🔬</span><span class="tree-soma-name">Non-neuronal Cells</span><span class="tree-soma-count">' + nonNeuronTypes.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
         Object.entries(subgroups).forEach(([subName, cells], si) => {
@@ -2706,7 +2701,7 @@ function buildCellDetailHTML(idx, useLinks) {
         }
     }
     const notesHtml = (ct.alertNotes && ct.alertNotes.length > 0) || (ct.curatorNotes && ct.curatorNotes.length > 0) ? `<div class="detail-section"><h3>📝 Notes</h3><div style="padding:0.5rem 0.75rem;background:#fef9c3;border:1px solid #eab308;border-radius:6px;font-size:0.9rem;line-height:1.5;">${ct.alertNotes && ct.alertNotes.length > 0 ? `<div style="margin-bottom:${ct.curatorNotes && ct.curatorNotes.length > 0 ? '1rem' : '0'};"><strong style="color:#b45309;">⚠️ Alert Notes:</strong>${ct.alertNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}${ct.curatorNotes && ct.curatorNotes.length > 0 ? `<div><strong style="color:#1e40af;">📋 Curator Notes:</strong>${ct.curatorNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}</div></div>` : '';
-    return `<div class="detail-section"><p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''}${g.expressionLevel?`<span class="method-badge expr-level">${g.expressionLevel}</span>`:''}${g.determinedBy?`<span class="method-badge">${g.determinedBy}</span>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype${ct.fiberTypeMethods?ct.fiberTypeMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology${ct.physiologyMethods?ct.physiologyMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
+    return `<div class="detail-section">${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as"><em>Also known as: ${ct.localLabel}</em></p>` : ''}<p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.subClassOf&&ct.subClassOf.length?`<p><strong>Subclass Of:</strong> ${ct.subClassOf.join(', ')}</p>`:''}${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}${ct.circuitRole?`<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>`:''}${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''}${g.expressionLevel?`<span class="method-badge expr-level">${g.expressionLevel}</span>`:''}${g.determinedBy?`<span class="method-badge">${g.determinedBy}</span>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype${ct.fiberTypeMethods?ct.fiberTypeMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology${ct.physiologyMethods?ct.physiologyMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
 }
 
 function buildRelatedSourceCellsHTML(idx) {
@@ -2731,7 +2726,7 @@ function renderCellDetailView(idx) {
     document.getElementById('cellDetailContent').innerHTML =
         `<div class="cell-detail-page">` +
             `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
-            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id">${ct.id||''}${(ct.baseClass||'neuron')!=='neuron'?'<span class="base-class-badge">Non-neuronal</span>':''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${buildSourceLine(ct)}</div>` +
+            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id">${ct.id||''}${(ct.baseClass||'neuron')!=='neuron'?'<span class="base-class-badge">Non-neuronal</span>':''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as" style="margin:-0.5rem 0 0.5rem;"><em>Also known as: ${ct.localLabel}</em></p>` : ''}${buildSourceLine(ct)}</div>` +
             `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
             buildRelatedSourceCellsHTML(idx) +
         `</div>`;
@@ -2796,12 +2791,14 @@ function copyPermalink(paramsObj) {
 function copyCardLink() {
     const p = { view: 'cards' };
     const source = document.getElementById('filterSource').value;
+    const baseClass = document.getElementById('filterBaseClass').value;
     const species = document.getElementById('filterSpecies').value;
     const axon = document.getElementById('filterAxon').value;
     const location = document.getElementById('filterLocation').value;
     const gene = document.getElementById('filterGene').value;
     const equiv = document.getElementById('filterEquiv').value;
     if (source) p.source = source;
+    if (baseClass) p.baseClass = baseClass;
     if (species) p.species = species;
     if (axon) p.axon = axon;
     if (location) p.location = location;
@@ -3643,6 +3640,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (params.toString()) {
         const view = params.get('view');
         const source = params.get('source');
+        const baseClass = params.get('baseClass');
         const species = params.get('species');
         const axon = params.get('axon');
         const location = params.get('location');
@@ -3708,6 +3706,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (source) {
             const el = document.getElementById('filterSource');
             const opt = [...el.options].find(o => o.value.toLowerCase() === source.toLowerCase());
+            if (opt) { el.value = opt.value; filtersApplied = true; }
+        }
+        if (baseClass) {
+            const el = document.getElementById('filterBaseClass');
+            const opt = [...el.options].find(o => o.value === baseClass);
             if (opt) { el.value = opt.value; filtersApplied = true; }
         }
         if (species) {

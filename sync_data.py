@@ -265,7 +265,7 @@ def parse_npo_data(rows):
             'preferredLabel': '',
             'baseClass': base_class,
             'species': 'unknown',
-            'circuitRole': 'sensory',
+            'circuitRole': '',
             'neurotransmitter': '',
             'somaLocation': '',
             'somaLocations': [],
@@ -294,6 +294,7 @@ def parse_npo_data(rows):
             'curatorNotes': [],
             'sourceData': [],
             'localLabel': '',
+            'subClassOf': [],
             'clusterAttributes': {
                 'cold_sensitive': False,
                 'heat_sensitive': False,
@@ -450,6 +451,10 @@ def parse_npo_data(rows):
             elif npo in ('TEMP:subClassOf', 'TEMP:assertedSubClassOf'):
                 target_id = iri if iri.startswith('npokb:') else entity_to_npokb.get(val, '')
                 ct['assertedSubclassOf'].append({'label': val, 'iri': iri, 'id': target_id})
+
+            elif npo == 'ilxtr:subClassOf' and val:
+                if val not in ct['subClassOf']:
+                    ct['subClassOf'].append(val)
 
         # Build derived strings
         ct['geneExpressionString'] = ' + '.join(g['display'] for g in gene_items)

@@ -60,6 +60,14 @@
                     </select>
                 </div>
                 <div class="filter-group">
+                    <span class="filter-label">Cell Class</span>
+                    <select class="filter-select" id="filterBaseClass" onchange="applyCardFilters()">
+                        <option value="">All Classes</option>
+                        <option value="neuron">Neuron</option>
+                        <option value="cell">Non-neuronal</option>
+                    </select>
+                </div>
+                <div class="filter-group">
                     <span class="filter-label">Species</span>
                     <select class="filter-select" id="filterSpecies" onchange="applyCardFilters()">
                         <option value="">All Species</option>

@@ -9,6 +9,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
 
 <body>
@@ -17,11 +19,12 @@
             <div>
                 <h1>🧬 NervoSensus</h1>
                 <p class="subtitle">Interactive Sensory Neuron Cell Type Explorer</p>
+                <p class="version-info" id="versionInfo"></p>
             </div>
             <div class="upload-section">
                 <button class="upload-btn" onclick="showUploadModal()">📁 Load Data</button>
                 <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(event)">
-                <span class="data-status" id="dataStatus">Default data (145 cells)</span>
+                <span class="data-status" id="dataStatus">Default data (143 neuron types + 10 non-neuronal)</span>
                 <button class="feedback-btn" onclick="openFeedback()">💬 Feedback</button>
             </div>
         </div>
@@ -31,12 +34,14 @@
             navigating the multiple, sometimes conflicting, nomenclatures used across different published atlases and
             studies. Nothing shown here represents settled scientific claim.</div>
         <div class="view-buttons">
-            <button class="view-btn active" data-view="cards">📋 Card View</button>
+            <button class="view-btn active" data-view="cluster">🔮 Cluster View</button>
             <button class="view-btn" data-view="tree">🌳 Tree View</button>
-            <button class="view-btn" data-view="synthesis">📊 Synthesis View</button>
-            <button class="view-btn" data-view="cluster">🔮 Cluster View</button>
-            <button class="view-btn" data-view="lineage">🌳 Provisional Mapping</button>
             <button class="view-btn" data-view="compare">🔀 Compare</button>
+            <button class="view-btn" data-view="synthesis">📊 Synthesis View</button>
+            <button class="view-btn" data-view="lineage">🌳 Provisional Mapping</button>
+            <button class="view-btn" data-view="cards">📋 Card View</button>
+            <button class="view-btn" data-view="align">🔗 Align View</button>
+            <button class="view-btn" data-view="concordance">📑 Concordance</button>
         </div>
         <div id="cardViewContainer" class="view-container">
             <h2 class="view-header">Card View</h2>
@@ -47,13 +52,20 @@
                     <span class="filter-label">Source</span>
                     <select class="filter-select" id="filterSource" onchange="applyCardFilters()">
                         <option value="">All Sources</option>
-                        <option value="CSA paper">CSA paper</option>
-                        <option value="big DRG paper">big DRG paper</option>
+                        <option value="Bhuiyan et al., 2024">Bhuiyan et al., 2024</option>
+                        <option value="Bhuiyan et al., 2025">Bhuiyan et al., 2025</option>
                         <option value="Tavares-Ferreira et al., 2022">Tavares-Ferreira et al., 2022</option>
                         <option value="Yu et al., 2024">Yu et al., 2024</option>
                         <option value="Krauter et al., 2025">Krauter et al., 2025</option>
                         <option value="Qi et al., 2024">Qi et al., 2024</option>
-                        <option value="Kupari et al., 2021">Kupari et al., 2021</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Cell Class</span>
+                    <select class="filter-select" id="filterBaseClass" onchange="applyCardFilters()">
+                        <option value="">All Classes</option>
+                        <option value="neuron">Neuron</option>
+                        <option value="cell">Non-neuronal</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -187,6 +199,15 @@
                 </div>
                 <div class="cluster-main">
                     <div class="cluster-controls" id="clusterControls">
+                        <div class="attr-group" style="margin-bottom:0.75rem;">
+                            <div class="attr-group-title" style="cursor:default;">Cell Type</div>
+                            <div class="attr-group-content expanded">
+                                <select id="clusterBaseClassFilter" class="filter-select" onchange="onClusterBaseClassChange()" style="width:100%;font-size:0.85rem;">
+                                    <option value="neuron">Neuron</option>
+                                    <option value="cell">Non-neuronal</option>
+                                </select>
+                            </div>
+                        </div>
                         <h3>Select Attributes</h3>
                         <div class="selected-attrs-display" id="selectedAttrsDisplay">No attributes selected</div>
                         <button class="clear-filters-btn" onclick="clearAllFilters()">✕ Clear All Filters</button>
@@ -235,13 +256,12 @@
                             <div class="attr-group-title" onclick="toggleAttrGroup('source')"><span
                                     id="toggle-source">▼</span> Source</div>
                             <div class="attr-group-content expanded" id="attr-group-source"><button class="attr-btn"
-                                    data-attr="source_0">CSA paper</button><button class="attr-btn"
-                                    data-attr="source_1">big DRG paper</button><button class="attr-btn"
+                                    data-attr="source_0">Bhuiyan et al., 2024</button><button class="attr-btn"
+                                    data-attr="source_1">Bhuiyan et al., 2025</button><button class="attr-btn"
                                     data-attr="source_2">Tavares-Ferreira et al., 2022</button><button class="attr-btn"
                                     data-attr="source_3">Yu et al., 2024</button><button class="attr-btn"
                                     data-attr="source_4">Krauter et al., 2025</button><button class="attr-btn"
-                                    data-attr="source_5">Qi et al., 2024</button><button class="attr-btn"
-                                    data-attr="source_6">Kupari et al., 2021</button></div>
+                                    data-attr="source_5">Qi et al., 2024</button></div>
                         </div>
                         <div class="attr-group">
                             <div class="attr-group-title" onclick="toggleAttrGroup('genes')"><span
@@ -276,12 +296,12 @@
                         <div class="lineage-legend-item">
                             <div
                                 style="width:14px;height:14px;border:2px solid #667eea;border-radius:3px;background:white;">
-                            </div> CSA paper
+                            </div> Bhuiyan et al., 2024
                         </div>
                         <div class="lineage-legend-item">
                             <div
                                 style="width:14px;height:14px;border:2px solid #f59e0b;border-radius:3px;background:white;">
-                            </div> big DRG paper
+                            </div> Bhuiyan et al., 2025
                         </div>
                         <div class="lineage-legend-item">
                             <div
@@ -302,11 +322,6 @@
                             <div
                                 style="width:14px;height:14px;border:2px solid #06b6d4;border-radius:3px;background:white;">
                             </div> Qi et al.
-                        </div>
-                        <div class="lineage-legend-item">
-                            <div
-                                style="width:14px;height:14px;border:2px solid #ec4899;border-radius:3px;background:white;">
-                            </div> Kupari et al.
                         </div>
                         <div style="display:flex;align-items:center;justify-content:space-between;"><button
                                 class="permalink-btn" onclick="copyLineageLink()">🔗 Copy Link</button></div>
@@ -335,12 +350,61 @@
                 <div id="compareTableWrapper" class="compare-table-wrapper"></div>
             </div>
         </div>
+        <div id="alignViewContainer" class="view-container" style="display:none;">
+            <div class="align-container">
+                <h2 class="view-header">🔗 Cross-Source Alignment</h2>
+                <p class="view-note">Big DRG paper cell types shown as parent rows with related cells from other sources expandable beneath. Checkmarks indicate properties reported in source publications.</p>
+                <div class="source-references" id="alignSourceRefs"></div>
+                <div class="align-controls">
+                    <button class="align-toggle-btn" id="alignExpandAll" onclick="toggleAlignAll()">Expand All</button>
+                    <span class="align-count" id="alignCount"></span>
+                    <button class="permalink-btn" onclick="copyAlignLink()" style="margin-left:auto;">🔗 Copy Link</button>
+                    <button class="permalink-btn" onclick="exportSourceReviewXlsx()" style="margin-left:0.5rem;">📊 Export .xlsx</button>
+                    <button class="permalink-btn" onclick="exportAlignDocx()" style="margin-left:0.5rem;">📄 Export .docx</button>
+                </div>
+                <div class="align-table-wrapper">
+                    <table class="align-table" id="alignTable"></table>
+                </div>
+                <div class="synthesis-legend">
+                    <div class="legend-item"><span class="check-mark">✓</span> Feature present</div>
+                    <div class="legend-item"><span class="dash-mark">—</span> Feature absent</div>
+                </div>
+            </div>
+        </div>
+        <div id="concordanceViewContainer" class="view-container" style="display:none;">
+            <div class="concordance-container">
+                <h2 class="view-header">📑 Cross-Source Concordance</h2>
+                <p class="view-note">Rows are anchored by the selected source. Columns show the local label each additional source uses for its corresponding cell type.</p>
+                <div class="source-references" id="concordanceSourceRefs"></div>
+                <div class="concordance-controls">
+                    <div class="conc-control-group">
+                        <label>Anchor Source:</label>
+                        <select id="concordanceAnchorSelect"></select>
+                    </div>
+                    <div class="conc-control-group">
+                        <label>Compare With:</label>
+                        <div id="concordanceSelectorsRow" class="compare-selectors-row"></div>
+                        <button class="compare-add-btn" id="concordanceAddBtn">+ Add Source</button>
+                    </div>
+                    <span class="concordance-count" id="concordanceCount"></span>
+                    <button class="permalink-btn" onclick="copyConcordanceLink()" style="margin-left:auto;">🔗 Copy Link</button>
+                    <button class="permalink-btn" onclick="exportConcordanceDocx()" style="margin-left:0.5rem;">📄 Export .docx</button>
+                </div>
+                <div class="concordance-table-wrapper">
+                    <table class="concordance-table" id="concordanceTable"></table>
+                </div>
+            </div>
+        </div>
+        <div id="cellDetailViewContainer" class="view-container" style="display:none;">
+            <div id="cellDetailContent"></div>
+        </div>
+        <footer class="sources-footer" id="sourcesFooter"></footer>
     </div>
     <div id="permalinkToast" class="permalink-toast" style="display:none;">Link copied to clipboard!</div>
     <div class="modal" id="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modalTitle"></h2><button class="close-btn" onclick="closeModal()">×</button>
+                <h2 id="modalTitle"></h2><span id="modalDetailLink"></span><button class="close-btn" onclick="closeModal()">×</button>
             </div>
             <div class="modal-body" id="modalBody"></div>
         </div>

@@ -1,10 +1,12 @@
+const APP_VERSION = '0.1.0-beta';
+
 let SOURCES = JSON.parse(JSON.stringify(DEFAULT_SOURCES));
 
 let CELL_TYPES = JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES));
 
-// Helper to check if a cell is a master cell (CSA paper with no species)
+// Helper to check if a cell is a master cell (Bhuiyan 2024 / CSA paper with no species)
 function isMasterCell(ct) {
-    if (ct.sourceNomenclatureLabel !== 'CSA paper') return false;
+    if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2024') return false;
     const label = ct.preferredLabel.toLowerCase();
     return !label.includes('mouse') && !label.includes('human') && 
            !label.includes('macaque') && !label.includes('guinea');
@@ -12,9 +14,17 @@ function isMasterCell(ct) {
 
 let FAMILIES = JSON.parse(JSON.stringify(DEFAULT_FAMILIES));
 let GENES = JSON.parse(JSON.stringify(DEFAULT_GENES));
-let currentView = 'cards';
+
+function buildIdIndex() {
+    const map = {};
+    CELL_TYPES.forEach((ct, i) => { if (ct.id) map[ct.id] = i; });
+    return map;
+}
+let ID_INDEX = buildIdIndex();
+
+let currentView = 'cluster';
 let treeGrouping = 'location';
-const AXON_LABELS = { 'type a nerve fiber': 'A fiber', 'type ab (beta) nerve fiber': 'Aβ fiber', 'type ad (delta) nerve fiber': 'Aδ fiber', 'type c nerve fiber': 'C fiber' };
+const AXON_LABELS = { 'type a nerve fiber': 'A fiber', 'type ab (beta) nerve fiber': 'Aβ fiber', 'type ad (delta) nerve fiber': 'Aδ fiber', 'type aβ nerve fiber': 'Aβ fiber', 'type aδ nerve fiber': 'Aδ fiber', 'type c nerve fiber': 'C fiber' };
 
 let selectedAttributes = [];
 let clusterSimulation = null;
@@ -23,15 +33,17 @@ let synthesisPinnedIdx = null;
 let clusterCenters = {};
 let nodeRadius = 14;
 let enclosureTimer = null;
+let clusterWidth = 0, clusterHeight = 0;
+let clusterNodeSelection = null;
 
 // Species labels used instead of icons
-const ATTR_LABELS = { source_0:'CSA paper', source_1:'big DRG paper', source_2:'Tavares-Ferreira et al., 2022', source_3:'Yu et al., 2024', source_4:'Krauter et al., 2025', source_5:'Qi et al., 2024', source_6:'Kupari et al., 2021',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprioceptive', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'Guinea Pig', soma_drg:'DRG', soma_tg:'Trigeminal' };
-const ATTR_SHORT = { source_0:'CSA paper', source_1:'big DRG paper', source_2:'Tavares-Ferreira 2022', source_3:'Yu 2024', source_4:'Krauter 2025', source_5:'Qi 2024', source_6:'Kupari 2021',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprio', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'G.Pig', soma_drg:'DRG', soma_tg:'TG' };
-const SOURCE_URLS = {"source_0": "https://doi.org/10.1126/sciadv.adj9173", "source_1": "https://doi.org/10.1101/2025.11.05.686654", "source_2": "https://doi.org/10.1126/scitranslmed.abj8186", "source_3": "https://doi.org/10.1038/s41593-024-01794-1", "source_4": "https://doi.org/10.1038/s42003-025-08315-1", "source_5": "https://doi.org/10.1016/j.cell.2024.02.006", "source_6": "https://doi.org/10.1038/s41467-021-21725-z"};
+const ATTR_LABELS = { source_0:'Bhuiyan et al., 2024', source_1:'Bhuiyan et al., 2025', source_2:'Tavares-Ferreira et al., 2022', source_3:'Yu et al., 2024', source_4:'Krauter et al., 2025', source_5:'Qi et al., 2024',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprioceptive', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'Guinea Pig', soma_drg:'DRG', soma_tg:'Trigeminal' };
+const ATTR_SHORT = { source_0:'Bhuiyan 2024', source_1:'Bhuiyan 2025', source_2:'Tavares-Ferreira 2022', source_3:'Yu 2024', source_4:'Krauter 2025', source_5:'Qi 2024',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprio', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'G.Pig', soma_drg:'DRG', soma_tg:'TG' };
+const SOURCE_URLS = {"source_0": "https://doi.org/10.1126/sciadv.adj9173", "source_1": "https://doi.org/10.1101/2025.11.05.686654", "source_2": "https://doi.org/10.1126/scitranslmed.abj8186", "source_3": "https://doi.org/10.1038/s41593-024-01794-1", "source_4": "https://doi.org/10.1038/s42003-025-08315-1", "source_5": "https://doi.org/10.1016/j.cell.2024.02.006"};
 const PRECISION_BASE_URL = 'https://sparc.science/apps/precision-dashboard';
 const PRECISION_GENES = new Set(["ADORA2B", "ADRA2A", "ADRA2C", "AGT", "ALDH1A1", "ASIC1", "ATF3", "AVPR1A", "BMPR1B", "CACNA1I", "CACNG5", "CALB1", "CALCA", "CASQ2", "CCK", "CCKAR", "CDH9", "CHRNA3", "CHRNA7", "CPNE6", "CUX2", "DCN", "EPHA3", "ETV1", "FOXP2", "GFRA1", "GFRA2", "GFRA3", "GPR68", "GRM8", "GRXCR2", "HAPLN4", "HRH1", "IL31RA", "IL3RA", "KCNS1", "KIT", "LGI2", "MRGPRD", "MRGPRX1", "MRGPRX4", "NGEF", "NPPB", "NSG2", "NTRK2", "NTRK3", "OPRD1", "OPRK1", "OPRM1", "PCDH8", "PENK", "PIEZO2", "PNOC", "PROKR2", "PTGIR", "PTPRT", "PVALB", "REEP5", "RXFP1", "S100A16", "S100A4", "SCGN", "SCN10A", "SCN11A", "SLC18A3", "SST", "SSTR2", "STUM", "SYT17", "TAC1", "TAC3", "TH", "TRPA1", "TRPM2", "TRPM8", "TRPV1"]);
-// Atlas annotation → big DRG paper cell preferredLabel (from ilxtr:atlasAnnotation in PRECISIONcelltypeNPO.xlsx,
-// keyed by Column A Neuron ID, filtered to ilxtr:literatureCitation = "big DRG paper" only)
+// Atlas annotation → Bhuiyan 2025 cell preferredLabel (from ilxtr:atlasAnnotation in PRECISIONcelltypeNPO.xlsx,
+// keyed by Column A Neuron ID, filtered to ilxtr:literatureCitation = "Bhuiyan et al., 2025" only)
 const ATLAS_TO_CELL = {
     "A-LTMR.TAC3": "DRG A-LTMR.TAC3 human neuron",
     "A-PEP.CHRNA7/SLC18A3": "DRG A-PEP.CHRNA7 SLC18A3 human neuron",
@@ -61,6 +73,25 @@ const ATTR_COLORS = ['#667eea', '#f5576c', '#22c55e', '#f59e0b', '#8b5cf6', '#ec
 function formatGeneExpression(t) { return t ? t.replace(/(\w+)\^(\w+)/g, '$1<sup>$2</sup>') : ''; }
 function formatFiberType(s) { return s ? s.replace(/type Ad/g,'type Aδ').replace(/type Ab/g,'type Aβ').replace(/Ad \(/g,'Aδ (').replace(/Ab \(/g,'Aβ (').replace(/\(delta\)/g,'(δ)').replace(/\(beta\)/g,'(β)') : ''; }
 function getSourceLinkText(ct) { return ct.sourceNomenclatureLabel || 'View Source Publication'; }
+function extractDOI(url) { if (!url) return ''; const m = url.match(/doi\.org\/(.+)$/); return m ? m[1] : url; }
+function buildSourceLine(ct) { const doi = extractDOI(ct.sourceNomenclature); return `<div class="card-source-line"><span class="card-source-name" style="color:${ct.sourceColor||'#667eea'}">${ct.sourceNomenclatureLabel||''}</span>${doi ? `<span class="card-source-sep">·</span><a class="card-source-doi" href="${ct.sourceNomenclature}" target="_blank" rel="noopener" onclick="event.stopPropagation();">${doi}</a>` : ''}</div>`; }
+function getSourceDOIMap() {
+    const map = {};
+    CELL_TYPES.forEach(ct => {
+        if (ct.sourceNomenclatureLabel && ct.sourceNomenclature && !map[ct.sourceNomenclatureLabel])
+            map[ct.sourceNomenclatureLabel] = { url: ct.sourceNomenclature, color: ct.sourceColor || '#667eea' };
+    });
+    return map;
+}
+function buildSourceRefsHTML(sourceNames) {
+    const doiMap = getSourceDOIMap();
+    return sourceNames.filter(s => doiMap[s]).map(s => {
+        const { url, color } = doiMap[s];
+        const doi = extractDOI(url);
+        return '<span class="source-ref-item"><span class="source-ref-name" style="color:' + color + '">' + s + '</span>' +
+            (doi ? '<span class="source-ref-sep">·</span><a class="source-ref-doi" href="' + url + '" target="_blank" rel="noopener">' + doi + '</a>' : '') + '</span>';
+    }).join('');
+}
 function linkifyUrls(text) {
     if (!text) return '';
     return text.replace(/(https?:\/\/[^\s<)"',]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">$1</a>');
@@ -248,6 +279,7 @@ function parseNPOData(rows) {
             markerGenes: [], geneExpressionString: '',
             fiberTypeString: '', fiberTypeStringAbbrev: '',
             physiologyString: '', physiologyStringAbbrev: '',
+            thresholdString: '', adaptationString: '', functionalString: '',
             creLine: '', color: sourceColor,
             masterLabel: subclassMap[nid] || '',
             relatedCells: [], mapsTo: [], assertedSubclassOf: [], geneBaseNames: [],
@@ -346,6 +378,9 @@ function parseNPOData(rows) {
         ct.fiberTypeString = axonItems.map(a => a.display).join(' + ');
         ct.fiberTypeStringAbbrev = ct.fiberTypeString;
         
+        ct.thresholdString = thresholdItems.map(p => p.display).join(', ');
+        ct.adaptationString = adaptationItems.map(p => p.display).join(', ');
+        ct.functionalString = functionalItems.map(p => p.display).join(', ');
         const allPhys = [...thresholdItems, ...adaptationItems, ...functionalItems];
         ct.physiologyString = allPhys.map(p => p.display).join(' + ');
         ct.physiologyStringAbbrev = ct.physiologyString;
@@ -418,10 +453,11 @@ function initGeneButtons() {
     });
 }
 
-function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); closeUploadModal(); selectedAttributes=[]; renderCards(); }
-const VIEW_NAMES = { cards: 'Card View', tree: 'Tree View', synthesis: 'Synthesis View', cluster: 'Cluster View', lineage: 'Provisional Mapping', compare: 'Compare' };
+function loadDefaultData() { CELL_TYPES=JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES)); FAMILIES=JSON.parse(JSON.stringify(DEFAULT_FAMILIES)); GENES=JSON.parse(JSON.stringify(DEFAULT_GENES)); ID_INDEX=buildIdIndex(); closeUploadModal(); selectedAttributes=[]; renderSourcesFooter(); updateDataStatus(); renderCards(); }
+function updateDataStatus() { const nn=CELL_TYPES.filter(ct=>(ct.baseClass||'neuron')!=='neuron').length; const n=CELL_TYPES.length-nn; document.getElementById('dataStatus').textContent=`Default data (${n} neuron types + ${nn} non-neuronal)`; }
+const VIEW_NAMES = { cards: 'Card View', tree: 'Tree View', synthesis: 'Synthesis View', cluster: 'Cluster View', lineage: 'Provisional Mapping', compare: 'Compare', align: 'Align View', concordance: 'Concordance' };
 function openFeedback() { const name = VIEW_NAMES[currentView] || currentView; window.open('nervosensus-feedback.html?view=' + encodeURIComponent(name), '_blank'); }
-function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); }
+function switchView(view) { currentView=view; document.querySelectorAll('.view-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view)); document.getElementById('cellDetailViewContainer').style.display='none'; document.getElementById('cardViewContainer').style.display=view==='cards'?'block':'none'; document.getElementById('treeViewContainer').style.display=view==='tree'?'block':'none'; document.getElementById('synthesisViewContainer').style.display=view==='synthesis'?'block':'none'; document.getElementById('clusterViewContainer').style.display=view==='cluster'?'block':'none'; document.getElementById('lineageViewContainer').style.display=view==='lineage'?'block':'none'; document.getElementById('compareViewContainer').style.display=view==='compare'?'block':'none'; document.getElementById('alignViewContainer').style.display=view==='align'?'block':'none'; document.getElementById('concordanceViewContainer').style.display=view==='concordance'?'block':'none'; if(view==='tree')renderTreeView(); if(view==='synthesis')renderSynthesisView(); if(view==='cluster')initClusterView(); if(view==='lineage')renderLineageView(); if(view==='compare')renderCompareView(); if(view==='align')renderAlignView(); if(view==='concordance')renderConcordanceView(); if(location.hash.startsWith('#cell/'))history.replaceState(null,'',location.pathname+location.search); }
 
 
 function setTreeGrouping(grouping) {
@@ -452,14 +488,17 @@ function populateFilterDropdowns() {
 
 function applyCardFilters() {
     const sourceFilter = document.getElementById('filterSource').value;
+    const baseClassFilter = document.getElementById('filterBaseClass').value;
     const speciesFilter = document.getElementById('filterSpecies').value;
     const axonFilter = document.getElementById('filterAxon').value;
     const locationFilter = document.getElementById('filterLocation').value;
     const geneFilter = document.getElementById('filterGene').value;
     const equivFilter = document.getElementById('filterEquiv').value;
-    
+
+    const SOURCE_ORDER = ['Bhuiyan et al., 2025'];
     const filtered = CELL_TYPES.filter((ct, idx) => {
         if (sourceFilter && ct.sourceNomenclatureLabel !== sourceFilter) return false;
+        if (baseClassFilter && (ct.baseClass || 'neuron') !== baseClassFilter) return false;
         if (speciesFilter && ct.species.toLowerCase() !== speciesFilter.toLowerCase()) return false;
         if (axonFilter && !ct.clusterAttributes[axonFilter]) return false;
         if (locationFilter && !ct.clusterAttributes[locationFilter]) return false;
@@ -467,6 +506,13 @@ function applyCardFilters() {
         if (equivFilter === 'yes' && (!ct.mapsTo || ct.mapsTo.length === 0)) return false;
         if (equivFilter === 'no' && ct.mapsTo && ct.mapsTo.length > 0) return false;
         return true;
+    });
+    filtered.sort((a, b) => {
+        const ai = SOURCE_ORDER.indexOf(a.sourceNomenclatureLabel);
+        const bi = SOURCE_ORDER.indexOf(b.sourceNomenclatureLabel);
+        const aPri = ai >= 0 ? ai : SOURCE_ORDER.length;
+        const bPri = bi >= 0 ? bi : SOURCE_ORDER.length;
+        return aPri - bPri;
     });
     
     document.getElementById('cardCount').textContent = filtered.length + ' cells';
@@ -487,10 +533,11 @@ function applyCardFilters() {
         
         return `<div class="card-compact" style="border-left-color:${ct.sourceColor||'#667eea'}" data-idx="${idx}">
             <div class="card-compact-header" onclick="toggleCardExpand(${idx})">
-                <div class="card-source-dot" style="background:${ct.sourceColor||'#667eea'}" title="${ct.sourceNomenclatureLabel||''}"></div>
                 <div class="card-compact-info">
+                    <div class="card-npokb-id">${ct.id||''}</div>
                     <div class="card-compact-name">${ct.preferredLabel}</div>
-                    <div class="card-compact-meta">${ct.species} • ${(ct.somaLocations||[]).join(', ') || 'Unknown location'}</div>
+                    <div class="card-compact-meta">${ct.species} • ${(ct.somaLocations||[]).join(', ') || 'Unknown location'}${ct.subClassOf&&ct.subClassOf.length ? ' • ' + ct.subClassOf.join(', ') : ''}</div>
+                    ${buildSourceLine(ct)}
                 </div>
                 <div class="card-compact-badges">${axonBadge}${equivBadge}${subtypeBadge}</div>
                 <button class="card-expand-btn" id="expand-btn-${idx}">▼</button>
@@ -500,26 +547,26 @@ function applyCardFilters() {
                     ${ct.geneExpressionString ? `<div class="card-section"><div class="section-title">🧬 Marker Genes</div><div class="gene-display">${formatGeneExpression(ct.geneExpressionString)}</div></div>` : ''}
                     ${ct.fiberTypeString ? `<div class="card-section"><div class="section-title">🔬 Axon Phenotype</div><div class="gene-display">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>` : ''}
                     ${ct.physiologyString ? `<div class="card-section"><div class="section-title">⚡ Physiology</div><div class="gene-display">${formatGeneExpression(ct.physiologyString)}</div></div>` : ''}
-                    ${ct.relatedCells && ct.relatedCells.length > 0 ? `<div class="card-section"><div class="section-title">🔗 Related Variants</div><div class="related-cells">${ct.relatedCells.map(rc => `<button class="related-cell-btn" onclick="event.stopPropagation();showModalByName('${rc.label.replace(/'/g, "\\'")}')">${rc.label}</button>`).join('')}</div></div>` : ''}
+                    ${ct.relatedCells && ct.relatedCells.length > 0 ? `<div class="card-section"><div class="section-title">🔗 Related Variants</div><div class="related-cells">${ct.relatedCells.map(rc => `<button class="related-cell-btn" onclick="event.stopPropagation();openCellById('${rc.id}')">${rc.label}</button>`).join('')}</div></div>` : ''}
                     ${(() => {
                         const rels = getAssertedRelationships(idx);
                         if (rels.equivalences.length === 0 && rels.subtypeOf.length === 0 && rels.hasSubtypes.length === 0) return '';
                         let html = '<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Proposed Relationships</div>';
                         if (rels.equivalences.length > 0) {
-                            html += '<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">' + 
-                                rels.equivalences.map(r => `<button class="related-cell-btn equiv-btn" onclick="event.stopPropagation();showModal(${r.idx})">${r.direction === 'to' ? '→' : '←'} ${r.label}</button>`).join('') + '</div></div>';
+                            html += '<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">' +
+                                rels.equivalences.map(r => `<a href="#cell/${r.id}" class="related-cell-btn equiv-btn" onclick="event.stopPropagation();">${r.direction === 'to' ? '→' : '←'} ${r.label}</a>`).join('') + '</div></div>';
                         }
                         if (rels.subtypeOf.length > 0) {
-                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Proposed subtype of:</div><div class="related-cells">' + 
-                                rels.subtypeOf.map(r => `<button class="related-cell-btn subtype-btn" onclick="event.stopPropagation();showModal(${r.idx})">↑ ${r.label}</button>`).join('') + '</div></div>';
+                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Proposed subtype of:</div><div class="related-cells">' +
+                                rels.subtypeOf.map(r => `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn" onclick="event.stopPropagation();">↑ ${r.label}</a>`).join('') + '</div></div>';
                         }
                         if (rels.hasSubtypes.length > 0) {
-                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">' + 
-                                rels.hasSubtypes.map(r => `<button class="related-cell-btn subtype-btn" onclick="event.stopPropagation();showModal(${r.idx})">↓ ${r.label}</button>`).join('') + '</div></div>';
+                            html += '<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">' +
+                                rels.hasSubtypes.map(r => `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn" onclick="event.stopPropagation();">↓ ${r.label}</a>`).join('') + '</div></div>';
                         }
                         return html + '</div>';
                     })()}
-                    <button style="margin-top:1rem;padding:0.5rem 1rem;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;" onclick="event.stopPropagation();showModal(${idx})">View Full Details</button>
+                    <a href="#cell/${ct.id}" style="display:inline-block;margin-top:1rem;padding:0.5rem 1rem;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;text-decoration:none;" onclick="event.stopPropagation();">View Full Details</a>
                 </div>
             </div>
         </div>`;
@@ -540,6 +587,7 @@ function toggleCardExpand(idx) {
 
 function clearCardFilters() {
     document.getElementById('filterSource').value = '';
+    document.getElementById('filterBaseClass').value = '';
     document.getElementById('filterSpecies').value = '';
     document.getElementById('filterAxon').value = '';
     document.getElementById('filterLocation').value = '';
@@ -566,7 +614,7 @@ function renderTreeView() {
             fn = fn.trim();
             const fk = fn.toLowerCase();
             if (!fm[fk]) fm[fk] = {name: fn, children: []};
-            fm[fk].children.push(ct.preferredLabel);
+            fm[fk].children.push({id: ct.id, label: ct.preferredLabel});
         });
         return Object.values(fm);
     }
@@ -577,15 +625,40 @@ function renderTreeView() {
             const uid = parentGi + '-' + fi;
             famHtml += '<div class="tree-item"><div class="tree-master" onclick="toggleFamily(\'' + uid + '\')"><span class="tree-toggle" id="toggle-' + uid + '">▶</span><div style="display:inline-block;vertical-align:top;"><div class="tree-master-name">' + formatGeneExpression(fam.name) + '</div><div class="tree-master-count">' + fam.children.length + ' variants</div></div></div><div class="tree-children" id="children-' + uid + '">';
             fam.children.forEach(ch => {
-                const ct = CELL_TYPES.find(x => x.preferredLabel === ch);
-                const safeLabel = ch.replace(/'/g, "\\'");
-                famHtml += '<div class="tree-child" onclick="showModalByName(\'' + safeLabel + '\')"><div class="tree-child-name">' + ch + '</div>' + (ct ? '<div class="tree-child-species">🧬 ' + (ct.geneExpressionString ? formatGeneExpression(ct.geneExpressionString) : 'No marker genes') + '</div>' : '') + '</div>';
+                const childId = ch.id || '';
+                const childLabel = ch.label || ch;
+                const ct = childId ? CELL_TYPES[ID_INDEX[childId]] : undefined;
+                const onclick = childId ? "openCellById('" + childId + "')" : "";
+                famHtml += '<div class="tree-child" onclick="' + onclick + '"><div class="tree-child-name">' + childLabel + '</div>' + (ct ? '<div class="tree-child-species">🧬 ' + (ct.geneExpressionString ? formatGeneExpression(ct.geneExpressionString) : 'No marker genes') + '</div>' : '') + '</div>';
             });
             famHtml += '</div></div>';
         });
         return famHtml;
     }
     
+    const neuronTypes = CELL_TYPES.filter(ct => (ct.baseClass || 'neuron') === 'neuron');
+    const nonNeuronTypes = CELL_TYPES.filter(ct => (ct.baseClass || 'neuron') !== 'neuron');
+
+    function renderNonNeuronSubgroups(cells, parentId) {
+        const subgroups = {};
+        cells.forEach(ct => {
+            const subs = ct.subClassOf || [];
+            const groupLabel = subs.length > 0 ? subs[subs.length - 1] : 'Other';
+            if (!subgroups[groupLabel]) subgroups[groupLabel] = [];
+            subgroups[groupLabel].push(ct);
+        });
+        let nnHtml = '';
+        Object.entries(subgroups).forEach(([subName, subCells], si) => {
+            const uid = parentId + '-nn-' + si;
+            nnHtml += '<div class="tree-item"><div class="tree-master" onclick="toggleFamily(\'' + uid + '\')"><span class="tree-toggle" id="toggle-' + uid + '">▶</span><div style="display:inline-block;vertical-align:top;"><div class="tree-master-name">' + subName + '</div><div class="tree-master-count">' + subCells.length + ' cells</div></div></div><div class="tree-children" id="children-' + uid + '">';
+            subCells.forEach(ct => {
+                nnHtml += '<div class="tree-child" onclick="openCellById(\'' + ct.id + '\')"><div class="tree-child-name">' + ct.preferredLabel + '</div></div>';
+            });
+            nnHtml += '</div></div>';
+        });
+        return nnHtml;
+    }
+
     if (treeGrouping === 'location') {
         let groups = {};
         CELL_TYPES.forEach(ct => {
@@ -594,30 +667,41 @@ function renderTreeView() {
                 if (!groups[loc].find(x => x.preferredLabel === ct.preferredLabel)) groups[loc].push(ct);
             });
         });
-        
-        Object.entries(groups).forEach(([groupName, cells]) => {
-            const fams = buildFamilies(cells);
+
+        Object.entries(groups).forEach(([groupName, allCells]) => {
+            const locNeurons = allCells.filter(ct => (ct.baseClass || 'neuron') === 'neuron');
+            const locNonNeurons = allCells.filter(ct => (ct.baseClass || 'neuron') !== 'neuron');
             const icon = locationIcons[groupName.toLowerCase()] || '📍';
-            html += '<div class="tree-soma-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">' + icon + '</span><span class="tree-soma-name">' + groupName + '</span><span class="tree-soma-count">' + fams.length + ' families • ' + cells.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
-            html += renderFamilies(fams, gi);
+            const neuronFams = buildFamilies(locNeurons);
+            html += '<div class="tree-soma-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">' + icon + '</span><span class="tree-soma-name">' + groupName + '</span><span class="tree-soma-count">' + allCells.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
+            if (locNeurons.length > 0) {
+                html += '<div class="tree-subgroup"><div class="tree-subgroup-header" onclick="toggleSubgroup(\'sub-' + gi + '-n\')"><span class="tree-soma-toggle" id="sub-toggle-' + gi + '-n">▶</span><span class="tree-soma-icon">🧠</span><span class="tree-soma-name">Neurons</span><span class="tree-soma-count">' + neuronFams.length + ' families • ' + locNeurons.length + ' cells</span></div><div class="tree-subgroup-children" id="sub-children-' + gi + '-n">';
+                html += renderFamilies(neuronFams, gi + 'n');
+                html += '</div></div>';
+            }
+            if (locNonNeurons.length > 0) {
+                html += '<div class="tree-subgroup non-neuronal-group"><div class="tree-subgroup-header" onclick="toggleSubgroup(\'sub-' + gi + '-nn\')"><span class="tree-soma-toggle" id="sub-toggle-' + gi + '-nn">▶</span><span class="tree-soma-icon">🔬</span><span class="tree-soma-name">Non-neuronal Cells</span><span class="tree-soma-count">' + locNonNeurons.length + ' cells</span></div><div class="tree-subgroup-children" id="sub-children-' + gi + '-nn">';
+                html += renderNonNeuronSubgroups(locNonNeurons, gi + 'nn');
+                html += '</div></div>';
+            }
             html += '</div></div>';
             gi++;
         });
     } else {
-        // Hierarchical axon grouping: A fiber (with Aβ, Aδ children), C fiber, Unknown
+        // Hierarchical axon grouping: A fiber (with Aβ, Aδ, A unspecified), C fiber, Unknown
         const aFiberCells = { beta: [], delta: [], other: [] };
         const cFiberCells = [];
         const unknownCells = [];
-        
-        CELL_TYPES.forEach(ct => {
+
+        neuronTypes.forEach(ct => {
             const fts = (ct.fiberTypeString || '').toLowerCase();
             const attrs = ct.clusterAttributes || {};
-            
+
             if (attrs.fiber_a_beta) {
                 if (!aFiberCells.beta.find(x => x.preferredLabel === ct.preferredLabel)) aFiberCells.beta.push(ct);
             } else if (attrs.fiber_a_delta) {
                 if (!aFiberCells.delta.find(x => x.preferredLabel === ct.preferredLabel)) aFiberCells.delta.push(ct);
-            } else if (fts.includes('type a') && !fts.includes('beta') && !fts.includes('delta')) {
+            } else if (fts.includes('type a') && !fts.includes('β') && !fts.includes('δ') && !fts.includes('beta') && !fts.includes('delta')) {
                 if (!aFiberCells.other.find(x => x.preferredLabel === ct.preferredLabel)) aFiberCells.other.push(ct);
             } else if (attrs.fiber_c || fts.includes('type c')) {
                 if (!cFiberCells.find(x => x.preferredLabel === ct.preferredLabel)) cFiberCells.push(ct);
@@ -625,13 +709,13 @@ function renderTreeView() {
                 if (!unknownCells.find(x => x.preferredLabel === ct.preferredLabel)) unknownCells.push(ct);
             }
         });
-        
+
         const totalACells = aFiberCells.beta.length + aFiberCells.delta.length + aFiberCells.other.length;
-        
+
         // A fiber group (parent)
         if (totalACells > 0) {
             html += '<div class="tree-soma-group"><div class="tree-soma-header axon" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">🔷</span><span class="tree-soma-name">A fiber</span><span class="tree-soma-count">' + totalACells + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
-            
+
             // Aβ fiber subgroup
             if (aFiberCells.beta.length > 0) {
                 const betaFams = buildFamilies(aFiberCells.beta);
@@ -639,7 +723,7 @@ function renderTreeView() {
                 html += renderFamilies(betaFams, gi + 'b');
                 html += '</div></div>';
             }
-            
+
             // Aδ fiber subgroup
             if (aFiberCells.delta.length > 0) {
                 const deltaFams = buildFamilies(aFiberCells.delta);
@@ -647,7 +731,7 @@ function renderTreeView() {
                 html += renderFamilies(deltaFams, gi + 'd');
                 html += '</div></div>';
             }
-            
+
             // Other A fibers (not beta or delta)
             if (aFiberCells.other.length > 0) {
                 const otherFams = buildFamilies(aFiberCells.other);
@@ -655,11 +739,11 @@ function renderTreeView() {
                 html += renderFamilies(otherFams, gi + 'o');
                 html += '</div></div>';
             }
-            
+
             html += '</div></div>';
             gi++;
         }
-        
+
         // C fiber group
         if (cFiberCells.length > 0) {
             const cFams = buildFamilies(cFiberCells);
@@ -668,7 +752,7 @@ function renderTreeView() {
             html += '</div></div>';
             gi++;
         }
-        
+
         // Unknown group
         if (unknownCells.length > 0) {
             const uFams = buildFamilies(unknownCells);
@@ -677,8 +761,16 @@ function renderTreeView() {
             html += '</div></div>';
             gi++;
         }
+
+        // Non-neuronal cells in axon view
+        if (nonNeuronTypes.length > 0) {
+            html += '<div class="tree-soma-group non-neuronal-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">🔬</span><span class="tree-soma-name">Non-neuronal Cells</span><span class="tree-soma-count">' + nonNeuronTypes.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
+            html += renderNonNeuronSubgroups(nonNeuronTypes, gi);
+            html += '</div></div>';
+            gi++;
+        }
     }
-    
+
     c.innerHTML = html;
 }
 function toggleSomaGroup(i){document.getElementById(`soma-children-${i}`).classList.toggle('expanded');document.getElementById(`soma-toggle-${i}`).classList.toggle('expanded');}
@@ -703,7 +795,7 @@ function renderSynthesisView() {
     CELL_TYPES.filter(ct => !isMasterCell(ct)).forEach((ct, idx) => {
         if (ct.mapsTo && ct.mapsTo.length > 0) {
             ct.mapsTo.forEach(m => {
-                const targetIdx = CELL_TYPES.findIndex(c => c.entity === m.label);
+                const targetIdx = m.id ? (ID_INDEX[m.id] ?? -1) : CELL_TYPES.findIndex(c => c.entity === m.label);
                 if (targetIdx !== -1) {
                     equivMap[idx] = targetIdx;
                     equivMap[targetIdx] = idx;
@@ -780,26 +872,28 @@ function renderSynthesisView() {
     
     // Group cells
     let groups = {};
+    function getAxonGroup(ct) {
+        const attrs = ct.clusterAttributes || {};
+        if (attrs.fiber_a_beta) return 'Aβ fiber';
+        if (attrs.fiber_a_delta) return 'Aδ fiber';
+        if (attrs.fiber_c) return 'C fiber';
+        const fts = (ct.fiberTypeString || '').toLowerCase();
+        if (fts.includes('type a')) return 'A fiber';
+        return 'Other';
+    }
+
     if (groupBy === 'species-axon') {
         sortedCells.forEach(ct => {
             const species = ct.species || 'Unknown';
-            let axon = 'Other';
-            if (ct.clusterAttributes.fiber_a_beta) axon = 'Aβ fiber';
-            else if (ct.clusterAttributes.fiber_a_delta) axon = 'Aδ fiber';
-            else if (ct.clusterAttributes.fiber_c) axon = 'C fiber';
-            
             const groupKey = species;
-            const subKey = axon;
+            const subKey = getAxonGroup(ct);
             if (!groups[groupKey]) groups[groupKey] = {};
             if (!groups[groupKey][subKey]) groups[groupKey][subKey] = [];
             groups[groupKey][subKey].push(ct);
         });
     } else if (groupBy === 'axon-species') {
         sortedCells.forEach(ct => {
-            let axon = 'Other';
-            if (ct.clusterAttributes.fiber_a_beta) axon = 'Aβ fiber';
-            else if (ct.clusterAttributes.fiber_a_delta) axon = 'Aδ fiber';
-            else if (ct.clusterAttributes.fiber_c) axon = 'C fiber';
+            const axon = getAxonGroup(ct);
             
             const groupKey = axon;
             const subKey = ct.species || 'Unknown';
@@ -826,13 +920,14 @@ function renderSynthesisView() {
     html += '</tr></thead>';
 
     // Build grouped rows
+    const axonOrder = ['Aβ fiber', 'Aδ fiber', 'A fiber', 'C fiber', 'Other'];
     const groupOrder = groupBy === 'species-axon' ? ['human', 'mouse', 'macaque', 'guinea pig'] :
-                      groupBy === 'axon-species' ? ['Aβ fiber', 'Aδ fiber', 'C fiber', 'Other'] :
+                      groupBy === 'axon-species' ? axonOrder :
                       Object.keys(groups).sort();
 
     // In pinned mode, status is shown above the table, no in-table header needed
 
-    const subGroupOrder = groupBy === 'species-axon' ? ['Aβ fiber', 'Aδ fiber', 'C fiber', 'Other'] :
+    const subGroupOrder = groupBy === 'species-axon' ? axonOrder :
                          groupBy === 'axon-species' ? ['human', 'mouse', 'macaque', 'guinea pig'] :
                          null;
 
@@ -936,6 +1031,610 @@ function clearRelationshipHighlights() {
     });
 }
 
+// ── Align View ──────────────────────────────────────────────────────────
+let alignExpandedState = {};
+
+function getAlignTemperature(ct) {
+    if (!ct.clusterAttributes) return '';
+    const cold = ct.clusterAttributes.cold_sensitive;
+    const heat = ct.clusterAttributes.heat_sensitive;
+    if (cold && heat) return 'Cold, Heat';
+    if (cold) return 'Cold';
+    if (heat) return 'Heat';
+    return '';
+}
+
+function getMarkerGeneNames(ct) {
+    if (!ct.markerGenes || ct.markerGenes.length === 0) return '';
+    return ct.markerGenes.map(g => g.name || '').filter(Boolean).join(', ');
+}
+
+function renderAlignView() {
+    const table = document.getElementById('alignTable');
+    const countEl = document.getElementById('alignCount');
+
+    // Columns for the align table
+    const columns = [
+        { key: 'expand', label: '', type: 'expand' },
+        { key: 'view', label: '', type: 'view' },
+        { key: 'name', label: 'Cell Type', type: 'name' },
+        { key: 'source', label: 'Source', type: 'source' },
+        { key: 'markerGenes', label: 'Marker Genes', type: 'genes' },
+        { key: 'fiber_a_beta', label: 'Aβ', type: 'bool' },
+        { key: 'fiber_a_delta', label: 'Aδ', type: 'bool' },
+        { key: 'fiber_c', label: 'C', type: 'bool' },
+        { key: 'mechanosensitive_ltm', label: 'LTM', type: 'bool' },
+        { key: 'mechanosensitive_htm', label: 'HTM', type: 'bool' },
+        { key: 'temperature', label: 'Temp', type: 'temperature' },
+        { key: 'proprioceptive', label: 'Proprio', type: 'bool' },
+        { key: 'rapidly_adapting', label: 'RA', type: 'bool' },
+        { key: 'slowly_adapting', label: 'SA', type: 'bool' },
+        { key: 'species', label: 'Species', type: 'text' },
+    ];
+
+    // Find Big DRG paper cells
+    const bigDrgCells = [];
+    CELL_TYPES.forEach((ct, idx) => {
+        if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025') {
+            bigDrgCells.push({ ...ct, origIdx: idx });
+        }
+    });
+
+    // For each Big DRG cell, find all related cells from other sources
+    const parentRows = [];
+    const usedChildIdxs = new Set();
+
+    bigDrgCells.forEach(parentCt => {
+        const rels = getAssertedRelationships(parentCt.origIdx);
+        const children = [];
+        const allRelated = [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes];
+        allRelated.forEach(r => {
+            if (r.idx !== parentCt.origIdx && CELL_TYPES[r.idx].sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') {
+                if (!children.find(c => c.origIdx === r.idx)) {
+                    children.push({ ...CELL_TYPES[r.idx], origIdx: r.idx });
+                    usedChildIdxs.add(r.idx);
+                }
+            }
+        });
+        // Sort children by source so cells from the same publication are grouped together
+        children.sort((a, b) => (a.sourceNomenclatureLabel || '').localeCompare(b.sourceNomenclatureLabel || ''));
+        parentRows.push({ parent: parentCt, children });
+    });
+
+    // Sort: parents with children first, then parents without children at bottom
+    const withChildren = parentRows.filter(r => r.children.length > 0);
+    const withoutChildren = parentRows.filter(r => r.children.length === 0);
+    withChildren.sort((a, b) => a.parent.preferredLabel.localeCompare(b.parent.preferredLabel));
+    withoutChildren.sort((a, b) => a.parent.preferredLabel.localeCompare(b.parent.preferredLabel));
+    const sortedRows = [...withChildren, ...withoutChildren];
+
+    const totalRelated = sortedRows.reduce((sum, r) => sum + r.children.length, 0);
+    if (countEl) countEl.textContent = bigDrgCells.length + ' Big DRG cells · ' + totalRelated + ' related cells';
+
+    // Source references
+    const alignSources = new Set();
+    sortedRows.forEach(r => {
+        alignSources.add(r.parent.sourceNomenclatureLabel);
+        r.children.forEach(c => alignSources.add(c.sourceNomenclatureLabel));
+    });
+    const refsEl = document.getElementById('alignSourceRefs');
+    if (refsEl) refsEl.innerHTML = buildSourceRefsHTML([...alignSources]);
+
+    // Build header
+    let html = '<thead><tr>';
+    columns.forEach(col => {
+        const cls = col.type === 'name' ? ' class="align-cell-name"' : col.type === 'genes' ? ' class="align-genes-col"' : '';
+        html += '<th' + cls + '>' + col.label + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    // Section header for cells with alignments
+    if (withChildren.length > 0) {
+        html += '<tr class="align-section-header"><td colspan="' + columns.length + '">Cells with cross-source alignments (' + withChildren.length + ')</td></tr>';
+    }
+
+    // Render rows
+    sortedRows.forEach((row, rowIdx) => {
+        const ct = row.parent;
+        const hasChildren = row.children.length > 0;
+        const isExpanded = alignExpandedState[ct.origIdx] === true;
+
+        // Insert section header before "no alignments" group
+        if (rowIdx === withChildren.length && withoutChildren.length > 0) {
+            html += '<tr class="align-section-header"><td colspan="' + columns.length + '">Cells without cross-source alignments (' + withoutChildren.length + ')</td></tr>';
+        }
+
+        // Parent row
+        html += '<tr class="align-parent-row' + (isExpanded ? ' expanded' : '') + '" data-idx="' + ct.origIdx + '">';
+        columns.forEach(col => {
+            if (col.type === 'expand') {
+                if (hasChildren) {
+                    html += '<td class="align-expand-cell" onclick="toggleAlignRow(' + ct.origIdx + ')"><span class="align-expand-icon' + (isExpanded ? ' expanded' : '') + '">▶</span></td>';
+                } else {
+                    html += '<td class="align-expand-cell"></td>';
+                }
+            } else if (col.type === 'view') {
+                html += '<td class="view-cell" onclick="showModal(' + ct.origIdx + ')" title="View details"><span class="view-icon">👁</span></td>';
+            } else if (col.type === 'name') {
+                html += '<td class="align-cell-name align-parent-name" title="' + ct.preferredLabel + '">' + (ct.localLabel || ct.preferredLabel) + (hasChildren ? ' <span class="align-child-count">(' + row.children.length + ')</span>' : '') + '</td>';
+            } else if (col.type === 'source') {
+                html += '<td class="align-source"><span style="color:' + (ct.sourceColor || '#f59e0b') + '">' + (ct.sourceNomenclatureLabel || '') + '</span></td>';
+            } else if (col.type === 'genes') {
+                html += '<td class="align-genes">' + getMarkerGeneNames(ct) + '</td>';
+            } else if (col.type === 'bool') {
+                const val = ct.clusterAttributes && ct.clusterAttributes[col.key];
+                html += '<td>' + (val ? '<span class="check-mark">✓</span>' : '<span class="dash-mark">—</span>') + '</td>';
+            } else if (col.type === 'temperature') {
+                const temp = getAlignTemperature(ct);
+                html += '<td class="align-temp">' + (temp || '<span class="dash-mark">—</span>') + '</td>';
+            } else if (col.type === 'text') {
+                html += '<td>' + (ct[col.key] || '—') + '</td>';
+            }
+        });
+        html += '</tr>';
+
+        // Child rows (shown/hidden based on expand state)
+        if (hasChildren) {
+            row.children.forEach(child => {
+                html += '<tr class="align-child-row" data-parent="' + ct.origIdx + '" style="display:' + (isExpanded ? 'table-row' : 'none') + ';">';
+                columns.forEach(col => {
+                    if (col.type === 'expand') {
+                        html += '<td></td>';
+                    } else if (col.type === 'view') {
+                        html += '<td class="view-cell" onclick="showModal(' + child.origIdx + ')" title="View details"><span class="view-icon">👁</span></td>';
+                    } else if (col.type === 'name') {
+                        html += '<td class="align-cell-name" title="' + child.preferredLabel + '">' + (child.localLabel || child.preferredLabel) + '</td>';
+                    } else if (col.type === 'source') {
+                        html += '<td class="align-source"><span style="color:' + (child.sourceColor || '#667eea') + '">' + (child.sourceNomenclatureLabel || '') + '</span></td>';
+                    } else if (col.type === 'genes') {
+                        html += '<td class="align-genes">' + getMarkerGeneNames(child) + '</td>';
+                    } else if (col.type === 'bool') {
+                        const val = child.clusterAttributes && child.clusterAttributes[col.key];
+                        html += '<td>' + (val ? '<span class="check-mark">✓</span>' : '<span class="dash-mark">—</span>') + '</td>';
+                    } else if (col.type === 'temperature') {
+                        const temp = getAlignTemperature(child);
+                        html += '<td class="align-temp">' + (temp || '<span class="dash-mark">—</span>') + '</td>';
+                    } else if (col.type === 'text') {
+                        html += '<td>' + (child[col.key] || '—') + '</td>';
+                    }
+                });
+                html += '</tr>';
+            });
+        }
+    });
+
+    html += '</tbody>';
+    table.innerHTML = html;
+}
+
+function toggleAlignRow(parentIdx) {
+    alignExpandedState[parentIdx] = !alignExpandedState[parentIdx];
+    const isExpanded = alignExpandedState[parentIdx];
+
+    // Toggle expand icon
+    const parentRow = document.querySelector('.align-table tr[data-idx="' + parentIdx + '"]');
+    if (parentRow) {
+        parentRow.classList.toggle('expanded', isExpanded);
+        const icon = parentRow.querySelector('.align-expand-icon');
+        if (icon) icon.classList.toggle('expanded', isExpanded);
+    }
+
+    // Toggle child rows
+    document.querySelectorAll('.align-table tr[data-parent="' + parentIdx + '"]').forEach(row => {
+        row.style.display = isExpanded ? 'table-row' : 'none';
+    });
+}
+
+function toggleAlignAll() {
+    const btn = document.getElementById('alignExpandAll');
+    const anyExpanded = Object.values(alignExpandedState).some(v => v);
+    const newState = !anyExpanded;
+
+    // Get all parent indices that have children
+    document.querySelectorAll('.align-table .align-expand-icon').forEach(icon => {
+        const parentRow = icon.closest('tr');
+        if (parentRow) {
+            const idx = parseInt(parentRow.dataset.idx);
+            alignExpandedState[idx] = newState;
+            parentRow.classList.toggle('expanded', newState);
+            icon.classList.toggle('expanded', newState);
+        }
+    });
+
+    document.querySelectorAll('.align-table .align-child-row').forEach(row => {
+        row.style.display = newState ? 'table-row' : 'none';
+    });
+
+    btn.textContent = newState ? 'Collapse All' : 'Expand All';
+}
+
+// ── Concordance View ────────────────────────────────────────────────
+let concordanceInitialized = false;
+
+const CONCORDANCE_SOURCE_SHORT = {
+    'Bhuiyan et al., 2024': 'Bhuiyan 2024',
+    'Bhuiyan et al., 2025': 'Bhuiyan 2025',
+    'Krauter et al., 2025': 'Krauter 2025',
+    'Qi et al., 2024': 'Qi 2024',
+    'Yu et al., 2024': 'Yu 2024',
+    'Tavares-Ferreira et al., 2022': 'Tavares-F. 2022',
+};
+
+function getConcordanceSources() {
+    const seen = new Set();
+    const sources = [];
+    CELL_TYPES.forEach(ct => {
+        const s = ct.sourceNomenclatureLabel;
+        if (s && !seen.has(s)) { seen.add(s); sources.push(s); }
+    });
+    return sources;
+}
+
+function getConcordanceSelections() {
+    const anchor = document.getElementById('concordanceAnchorSelect').value;
+    const container = document.getElementById('concordanceSelectorsRow');
+    const selects = container.querySelectorAll('select');
+    const compareSources = [...selects].map(s => s.value).filter(Boolean);
+    return { anchor, compareSources };
+}
+
+function renderConcordanceView(anchorPreset, comparePreset) {
+    const anchorSelect = document.getElementById('concordanceAnchorSelect');
+    const allSources = getConcordanceSources();
+
+    if (!concordanceInitialized) {
+        anchorSelect.innerHTML = allSources.map(s =>
+            '<option value="' + s + '">' + s + '</option>'
+        ).join('');
+        if (anchorPreset && allSources.includes(anchorPreset)) {
+            anchorSelect.value = anchorPreset;
+        } else if (allSources.includes('Bhuiyan et al., 2025')) {
+            anchorSelect.value = 'Bhuiyan et al., 2025';
+        }
+
+        anchorSelect.addEventListener('change', () => {
+            document.getElementById('concordanceSelectorsRow').innerHTML = '';
+            updateConcordanceTable();
+        });
+
+        document.getElementById('concordanceAddBtn').addEventListener('click', () => addConcordanceSource());
+
+        concordanceInitialized = true;
+    }
+
+    // Apply presets from URL
+    if (anchorPreset && allSources.includes(anchorPreset)) {
+        anchorSelect.value = anchorPreset;
+    }
+
+    // Build compare selectors from URL presets only (otherwise start empty)
+    document.getElementById('concordanceSelectorsRow').innerHTML = '';
+    if (comparePreset && comparePreset.length > 0) {
+        for (const cs of comparePreset) {
+            if (allSources.includes(cs) && cs !== anchorSelect.value) {
+                addConcordanceSource(cs);
+            }
+        }
+    }
+
+    updateConcordanceTable();
+}
+
+function addConcordanceSource(preselect) {
+    const container = document.getElementById('concordanceSelectorsRow');
+    const anchor = document.getElementById('concordanceAnchorSelect').value;
+    const existingSelects = container.querySelectorAll('select');
+    const usedSources = new Set([anchor, ...[...existingSelects].map(s => s.value).filter(Boolean)]);
+    const available = getConcordanceSources().filter(s => !usedSources.has(s));
+    if (!available.length) return;
+
+    const wrapper = document.createElement('span');
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '0.2rem';
+
+    const select = document.createElement('select');
+    select.innerHTML = '<option value="">Select source...</option>' + available.map(s =>
+        '<option value="' + s + '"' + (preselect === s ? ' selected' : '') + '>' + s + '</option>'
+    ).join('');
+    select.addEventListener('change', updateConcordanceTable);
+    select.style.cssText = 'padding:0.4rem 0.75rem;border-radius:6px;border:1px solid #cbd5e0;font-size:0.85rem;background:white;';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'compare-remove-btn';
+    removeBtn.textContent = '✕';
+    removeBtn.onclick = () => { wrapper.remove(); updateConcordanceTable(); };
+
+    wrapper.appendChild(select);
+    wrapper.appendChild(removeBtn);
+    container.appendChild(wrapper);
+
+    if (preselect) updateConcordanceTable();
+}
+
+function updateConcordanceTable() {
+    const table = document.getElementById('concordanceTable');
+    const countEl = document.getElementById('concordanceCount');
+    const { anchor: anchorSource, compareSources } = getConcordanceSelections();
+
+    // Source colors
+    const sourceColorMap = {};
+    CELL_TYPES.forEach(ct => {
+        if (ct.sourceNomenclatureLabel && ct.sourceColor)
+            sourceColorMap[ct.sourceNomenclatureLabel] = ct.sourceColor;
+    });
+
+    // The display columns: anchor first, then selected compare sources
+    const displaySources = [anchorSource, ...compareSources];
+
+    // Update Add button visibility
+    const allSources = getConcordanceSources();
+    const usedSources = new Set(displaySources);
+    const available = allSources.filter(s => !usedSources.has(s));
+    document.getElementById('concordanceAddBtn').style.display = available.length > 0 ? 'inline-block' : 'none';
+
+    // Build rows anchored by anchor source cells
+    const anchorCells = [];
+    CELL_TYPES.forEach((ct, idx) => {
+        if (ct.sourceNomenclatureLabel === anchorSource)
+            anchorCells.push({ ct, idx });
+    });
+
+    const rows = [];
+    anchorCells.forEach(({ ct: parentCt, idx: parentIdx }) => {
+        const rels = getAssertedRelationships(parentIdx);
+        const allRelated = [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes];
+        const bySource = {};
+        displaySources.forEach(s => { bySource[s] = []; });
+        bySource[anchorSource].push({ label: parentCt.localLabel || parentCt.preferredLabel, idx: parentIdx });
+        allRelated.forEach(r => {
+            if (r.idx === parentIdx) return;
+            const rCt = CELL_TYPES[r.idx];
+            const src = rCt.sourceNomenclatureLabel;
+            if (bySource[src] !== undefined && !bySource[src].find(e => e.idx === r.idx)) {
+                bySource[src].push({ label: rCt.localLabel || rCt.preferredLabel, idx: r.idx });
+            }
+        });
+        rows.push({ parentIdx, parentLabel: parentCt.localLabel || parentCt.preferredLabel, bySource });
+    });
+
+    rows.sort((a, b) => a.parentLabel.localeCompare(b.parentLabel));
+
+    // Source references
+    const concRefsEl = document.getElementById('concordanceSourceRefs');
+    if (concRefsEl) concRefsEl.innerHTML = buildSourceRefsHTML(displaySources);
+
+    // Count
+    let totalMapped = 0;
+    rows.forEach(r => {
+        displaySources.forEach(s => { totalMapped += r.bySource[s].length; });
+    });
+    const anchorShort = CONCORDANCE_SOURCE_SHORT[anchorSource] || anchorSource;
+    if (countEl) countEl.textContent = anchorCells.length + ' ' + anchorShort + ' cells · ' + totalMapped + ' total entries';
+
+    // Build table
+    let html = '<thead><tr><th class="conc-row-num">#</th>';
+    displaySources.forEach(src => {
+        const color = sourceColorMap[src] || '#667eea';
+        const shortName = CONCORDANCE_SOURCE_SHORT[src] || src;
+        html += '<th class="conc-source-col" style="border-bottom:3px solid ' + color + ';">' + shortName + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    rows.forEach((row, rowIdx) => {
+        html += '<tr>';
+        html += '<td class="conc-row-num">' + (rowIdx + 1) + '</td>';
+        displaySources.forEach(src => {
+            const entries = row.bySource[src];
+            if (!entries || entries.length === 0) {
+                html += '<td class="conc-empty"></td>';
+            } else {
+                const isAnchor = src === anchorSource;
+                const cellHtml = entries.map(e =>
+                    '<span class="conc-label' + (isAnchor ? ' conc-anchor' : '') + '" onclick="showModal(' + e.idx + ')" title="' + CELL_TYPES[e.idx].preferredLabel + '">' + e.label + '</span>'
+                ).join('<br>');
+                html += '<td class="conc-cell">' + cellHtml + '</td>';
+            }
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody>';
+    table.innerHTML = html;
+}
+
+function copyConcordanceLink() {
+    const { anchor, compareSources } = getConcordanceSelections();
+    const p = { view: 'concordance', anchor };
+    if (compareSources.length > 0) p.compare = compareSources.join('|');
+    copyPermalink(p);
+}
+
+async function exportConcordanceDocx() {
+    if (typeof docx === 'undefined') {
+        alert('Document export library not loaded. Please check your internet connection and reload the page.');
+        return;
+    }
+    const { anchor: anchorSource, compareSources } = getConcordanceSelections();
+    if (!compareSources.length) {
+        alert('Please add at least one compare source before exporting.');
+        return;
+    }
+    try {
+        const displaySources = [anchorSource, ...compareSources];
+
+        // Derive source colors from data (strip # prefix for docx hex)
+        const sourceColorMap = {};
+        CELL_TYPES.forEach(ct => {
+            if (ct.sourceNomenclatureLabel && ct.sourceColor)
+                sourceColorMap[ct.sourceNomenclatureLabel] = ct.sourceColor.replace('#', '');
+        });
+
+        // Build concordance data (same logic as updateConcordanceTable)
+        const anchorCells = [];
+        CELL_TYPES.forEach((ct, idx) => {
+            if (ct.sourceNomenclatureLabel === anchorSource) anchorCells.push({ ct, idx });
+        });
+        const rows = [];
+        anchorCells.forEach(({ ct: parentCt, idx: parentIdx }) => {
+            const rels = getAssertedRelationships(parentIdx);
+            const allRelated = [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes];
+            const bySource = {};
+            displaySources.forEach(s => { bySource[s] = []; });
+            bySource[anchorSource].push({ label: parentCt.localLabel || parentCt.preferredLabel });
+            allRelated.forEach(r => {
+                if (r.idx === parentIdx) return;
+                const rCt = CELL_TYPES[r.idx];
+                const src = rCt.sourceNomenclatureLabel;
+                if (bySource[src] !== undefined && !bySource[src].find(e => e.idx === r.idx)) {
+                    bySource[src].push({ label: rCt.localLabel || rCt.preferredLabel, idx: r.idx });
+                }
+            });
+            rows.push({ parentLabel: parentCt.localLabel || parentCt.preferredLabel, bySource });
+        });
+        rows.sort((a, b) => a.parentLabel.localeCompare(b.parentLabel));
+
+        const D = docx;
+        const colWidth = Math.floor(95 / displaySources.length);
+
+        // Header row
+        const headerCells = [
+            new D.TableCell({
+                children: [new D.Paragraph({
+                    alignment: D.AlignmentType.CENTER,
+                    spacing: { before: 20, after: 20 },
+                    children: [new D.TextRun({ text: '#', bold: true, size: 14, color: 'a0aec0', font: 'Arial' })]
+                })],
+                shading: { fill: 'f8fafc', type: D.ShadingType.CLEAR, color: 'auto' },
+                width: { size: 5, type: D.WidthType.PERCENTAGE }
+            })
+        ];
+        displaySources.forEach(src => {
+            const shortName = CONCORDANCE_SOURCE_SHORT[src] || src;
+            const color = sourceColorMap[src] || '667eea';
+            headerCells.push(new D.TableCell({
+                children: [new D.Paragraph({
+                    alignment: D.AlignmentType.CENTER,
+                    spacing: { before: 20, after: 20 },
+                    children: [new D.TextRun({ text: shortName, bold: true, size: 16, color: 'FFFFFF', font: 'Arial' })]
+                })],
+                shading: { fill: color, type: D.ShadingType.CLEAR, color: 'auto' },
+                width: { size: colWidth, type: D.WidthType.PERCENTAGE }
+            }));
+        });
+        const headerRow = new D.TableRow({ children: headerCells, tableHeader: true });
+
+        // Data rows
+        const dataRows = rows.map((row, rowIdx) => {
+            const cells = [
+                new D.TableCell({
+                    children: [new D.Paragraph({
+                        alignment: D.AlignmentType.CENTER,
+                        spacing: { before: 20, after: 20 },
+                        children: [new D.TextRun({ text: String(rowIdx + 1), size: 14, color: 'a0aec0', font: 'Arial' })]
+                    })],
+                    width: { size: 5, type: D.WidthType.PERCENTAGE }
+                })
+            ];
+            displaySources.forEach(src => {
+                const entries = row.bySource[src] || [];
+                if (!entries.length) {
+                    cells.push(new D.TableCell({
+                        children: [new D.Paragraph({ children: [] })],
+                        shading: { fill: 'fafbfc', type: D.ShadingType.CLEAR, color: 'auto' },
+                        width: { size: colWidth, type: D.WidthType.PERCENTAGE }
+                    }));
+                } else {
+                    const isAnchor = src === anchorSource;
+                    const paragraphs = entries.map(e => new D.Paragraph({
+                        spacing: { before: 20, after: 20 },
+                        children: [new D.TextRun({
+                            text: e.label,
+                            bold: isAnchor,
+                            size: 16,
+                            color: isAnchor ? '1a202c' : '2d3748',
+                            font: 'Arial'
+                        })]
+                    }));
+                    cells.push(new D.TableCell({
+                        children: paragraphs,
+                        width: { size: colWidth, type: D.WidthType.PERCENTAGE }
+                    }));
+                }
+            });
+            return new D.TableRow({ children: cells });
+        });
+
+        const table = new D.Table({
+            rows: [headerRow, ...dataRows],
+            width: { size: 100, type: D.WidthType.PERCENTAGE }
+        });
+
+        const doc = new D.Document({
+            sections: [{
+                properties: {
+                    page: {
+                        size: { width: 16838, height: 11906, orientation: D.PageOrientation.LANDSCAPE },
+                        margin: { top: 850, bottom: 850, left: 850, right: 850 }
+                    }
+                },
+                children: [
+                    new D.Paragraph({
+                        spacing: { after: 100 },
+                        children: [new D.TextRun({ text: 'NervoSensus — Cross-Source Concordance', bold: true, size: 32, color: '2d3748', font: 'Arial' })]
+                    }),
+                    new D.Paragraph({
+                        spacing: { after: 100 },
+                        children: [
+                            new D.TextRun({ text: 'Anchor: ' + anchorSource + ' (' + anchorCells.length + ' cell types). ', size: 18, color: '718096', font: 'Arial' }),
+                            new D.TextRun({ text: 'Columns show the local label (ilxtr:localLabel) each source uses for its corresponding cell type.', size: 18, color: '718096', font: 'Arial' })
+                        ]
+                    }),
+                    ...displaySources.map(src => {
+                        const doiMap = getSourceDOIMap();
+                        const info = doiMap[src];
+                        const doi = info ? extractDOI(info.url) : '';
+                        const children = [new D.TextRun({ text: src, bold: true, size: 16, color: (info ? info.color.replace('#', '') : '667eea'), font: 'Arial' })];
+                        if (doi && info) {
+                            children.push(new D.TextRun({ text: '  ·  ', size: 16, color: 'cbd5e0', font: 'Arial' }));
+                            children.push(new D.ExternalHyperlink({
+                                children: [new D.TextRun({ text: doi, style: 'Hyperlink', size: 16, color: '667eea', font: 'Arial' })],
+                                link: info.url
+                            }));
+                        }
+                        return new D.Paragraph({ spacing: { before: 20, after: 20 }, children });
+                    }),
+                    new D.Paragraph({ spacing: { after: 100 }, children: [] }),
+                    table,
+                    new D.Paragraph({ children: [] }),
+                    new D.Paragraph({
+                        children: [
+                            new D.TextRun({ text: 'Submit feedback at: ', size: 18, color: '718096', font: 'Arial' }),
+                            new D.ExternalHyperlink({
+                                children: [new D.TextRun({ text: 'nervosensus-feedback.html', style: 'Hyperlink', size: 18, color: '667eea', font: 'Arial' })],
+                                link: 'https://stappan.github.io/nervosensus/nervosensus-feedback.html?view=Concordance'
+                            })
+                        ]
+                    })
+                ]
+            }]
+        });
+
+        const blob = await D.Packer.toBlob(doc);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'NervoSensus_Concordance.docx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Concordance export error:', err);
+        alert('Export failed: ' + err.message);
+    }
+}
+
 function togglePinnedRow(idx) {
     const highlightEquiv = document.getElementById('synthesisHighlightEquiv')?.checked === true;
     const highlightSubtype = document.getElementById('synthesisHighlightSubtype')?.checked === true;
@@ -1000,7 +1699,9 @@ function togglePinnedRow(idx) {
 function highlightEquivPair(idx) { highlightRelationships(idx); }
 function clearEquivHighlight() { clearRelationshipHighlights(); }
 
-function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); svg.attr('width',width).attr('height',height); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); clusterNodes=CELL_TYPES.map((ct,i)=>({...ct,id:i,x:width/2+(Math.random()-0.5)*width*0.6,y:height/2+(Math.random()-0.5)*height*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(width/2,height/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
+function getClusterBaseClassFilter() { const el = document.getElementById('clusterBaseClassFilter'); return el ? el.value : 'neuron'; }
+function onClusterBaseClassChange() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); initClusterView(); updateClusterStats(); updateClusterLegend(); }
+function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); const baseClassFilter=getClusterBaseClassFilter(); const filteredCells=CELL_TYPES.map((ct,i)=>({ct,i})).filter(x=>(x.ct.baseClass||'neuron')===baseClassFilter); clusterNodes=filteredCells.map(x=>({...x.ct,idx:x.i,id:x.i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); updateClusterStats(); updateClusterLegend(); }
 
 function clearAllFilters() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); updateClusterLegend(); updateClusterStats(); updateClusterVisualization(); }
 function updateSelectedDisplay() { const display=document.getElementById('selectedAttrsDisplay'); if(selectedAttributes.length===0){display.textContent='No attributes selected';}else{const labels=selectedAttributes.map(a=>{if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);return gene?gene.display:a;}return ATTR_LABELS[a]||a;});display.textContent=`Selected (${labels.length}): ${labels.join(', ')}`;} }
@@ -1112,7 +1813,7 @@ function calculateClusterCenters(w,h) {
                 y: centerY + radius * Math.sin(angle) * 0.85
             };
         }); } }
-function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); const width=container.clientWidth,height=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(width,height)/60)); clusterNodes.forEach(n=>n.radius=nodeRadius); calculateClusterCenters(width,height); if(enclosureTimer){clearTimeout(enclosureTimer);enclosureTimer=null;} if(selectedAttributes.length>0){clusterSimulation.force('radial',null).force('x',d3.forceX(d=>clusterCenters[getClusterKey(d)]?.x||width/2).strength(0.85)).force('y',d3.forceY(d=>clusterCenters[getClusterKey(d)]?.y||height/2).strength(0.85)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.9));}else{clusterSimulation.force('radial',null).force('x',d3.forceX(width/2).strength(0.3)).force('y',d3.forceY(height/2).strength(0.3)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+2).strength(0.8));} clusterSimulation.alpha(0.8).restart(); const ns=svg.select('.nodes').selectAll('.cluster-node').data(clusterNodes,d=>d.id); const ne=ns.enter().append('circle').attr('class','cluster-node').attr('r',d=>d.radius).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded)).on('mouseover',showClusterTooltip).on('mousemove',moveClusterTooltip).on('mouseout',hideClusterTooltip).on('click',(e,d)=>showModal(d.id)); ns.merge(ne).transition().duration(300)
+function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); clusterNodes.forEach(n=>n.radius=nodeRadius); calculateClusterCenters(clusterWidth,clusterHeight); if(enclosureTimer){clearTimeout(enclosureTimer);enclosureTimer=null;} if(selectedAttributes.length>0){clusterSimulation.force('radial',null).force('x',d3.forceX(d=>clusterCenters[getClusterKey(d)]?.x||clusterWidth/2).strength(0.85)).force('y',d3.forceY(d=>clusterCenters[getClusterKey(d)]?.y||clusterHeight/2).strength(0.85)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.9));}else{clusterSimulation.force('radial',null).force('x',d3.forceX(clusterWidth/2).strength(0.3)).force('y',d3.forceY(clusterHeight/2).strength(0.3)).force('charge',d3.forceManyBody().strength(-15)).force('collision',d3.forceCollide().radius(d=>d.radius+2).strength(0.8));} clusterSimulation.alpha(0.5).restart(); const ns=svg.select('.nodes').selectAll('.cluster-node').data(clusterNodes,d=>d.id); const ne=ns.enter().append('circle').attr('class','cluster-node').attr('r',d=>d.radius).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded)).on('mouseover',showClusterTooltip).on('mousemove',moveClusterTooltip).on('mouseout',hideClusterTooltip).on('click',(e,d)=>showModal(d.id)); clusterNodeSelection=ns.merge(ne); clusterNodeSelection.transition().duration(300)
         .attr('r', d => {
             if(selectedAttributes.length >= 2) {
                 const mc = selectedAttributes.map(a => cellMatchesAttr(d, a)).filter(Boolean).length;
@@ -1121,18 +1822,17 @@ function updateClusterVisualization() { const svg=d3.select('#clusterSvg'); cons
             return d.radius;
         })
         .attr('fill',d=>getNodeColor(d)).attr('stroke',d=>d.sourceColor||'#667eea').attr('stroke-width', 2.5);
-    
-    // Add/remove all-match class for glow effect
-    svg.select('.nodes').selectAll('.cluster-node').classed('all-match', d => {
+
+    clusterNodeSelection.classed('all-match', d => {
         if(selectedAttributes.length >= 2) {
             const mc = selectedAttributes.map(a => cellMatchesAttr(d, a)).filter(Boolean).length;
             return mc === selectedAttributes.length;
         }
         return false;
     });
-    
+
     scheduleEnclosureRedraw(); }
-function scheduleEnclosureRedraw() { if(enclosureTimer)clearTimeout(enclosureTimer); enclosureTimer=setTimeout(()=>{drawClusterEnclosures();enclosureTimer=setTimeout(()=>{drawClusterEnclosures();enclosureTimer=setTimeout(drawClusterEnclosures,800);},600);},400); }
+function scheduleEnclosureRedraw() { if(enclosureTimer)clearTimeout(enclosureTimer); enclosureTimer=setTimeout(()=>{drawClusterEnclosures();enclosureTimer=null;},500); }
 function drawClusterEnclosures() { const svg=d3.select('#clusterSvg'); svg.select('.enclosures').selectAll('*').remove(); svg.select('.labels').selectAll('*').remove(); if(selectedAttributes.length===0)return; const clusters={}; clusterNodes.forEach(n=>{const k=getClusterKey(n);if(!clusters[k])clusters[k]=[];clusters[k].push(n);}); Object.entries(clusters).forEach(([key,nodes])=>{if(nodes.length===0)return; const pad=nodeRadius*1.2; const minX=d3.min(nodes,d=>d.x)-pad,maxX=d3.max(nodes,d=>d.x)+pad; const minY=d3.min(nodes,d=>d.y)-pad,maxY=d3.max(nodes,d=>d.y)+pad; const cx=(minX+maxX)/2,cy=(minY+maxY)/2; const rx=Math.max((maxX-minX)/2,nodeRadius*2.5); const ry=Math.max((maxY-minY)/2,nodeRadius*2.5); const color=getClusterColor(key),label=getClusterLabel(key); const isAllCluster = selectedAttributes.length >= 2 && key.split('').filter(c=>c==='1').length === selectedAttributes.length;
         svg.select('.enclosures').append('ellipse')
             .attr('class', 'cluster-enclosure' + (isAllCluster ? ' all-enclosure' : ''))
@@ -1140,20 +1840,15 @@ function drawClusterEnclosures() { const svg=d3.select('#clusterSvg'); svg.selec
             .attr('rx',rx+2).attr('ry',ry+2)
             .attr('stroke',color)
             .attr('fill', isAllCluster ? 'rgba(255, 215, 0, 0.15)' : 'none'); const lt=`${label} (${nodes.length})`,ly=Math.max(18, minY-6),tw=lt.length*5.5+12; svg.select('.labels').append('rect').attr('class','cluster-label-bg').attr('x',cx-tw/2).attr('y',ly-10).attr('width',tw).attr('height',16); svg.select('.labels').append('text').attr('class','cluster-label').attr('x',cx).attr('y',ly+2).attr('fill',color).text(lt);}); }
-function clusterTicked() { 
-    const container = document.querySelector('.cluster-viz-area');
-    const w = container.clientWidth, h = container.clientHeight;
+function clusterTicked() {
     const padding = nodeRadius + 5;
-    
-    // Clamp nodes to stay within viewport bounds
     clusterNodes.forEach(d => {
-        d.x = Math.max(padding, Math.min(w - padding, d.x));
-        d.y = Math.max(padding + 20, Math.min(h - padding, d.y)); // +20 for label space at top
+        d.x = Math.max(padding, Math.min(clusterWidth - padding, d.x));
+        d.y = Math.max(padding + 20, Math.min(clusterHeight - padding, d.y));
     });
-    
-    d3.select('#clusterSvg').select('.nodes').selectAll('.cluster-node')
-        .attr('cx', d => d.x)
-        .attr('cy', d => d.y); 
+    if (clusterNodeSelection) {
+        clusterNodeSelection.attr('cx', d => d.x).attr('cy', d => d.y);
+    }
 }
 function dragStarted(e,d) { if(!e.active)clusterSimulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y; }
 function dragged(e,d) { d.fx=e.x;d.fy=e.y; }
@@ -1164,21 +1859,23 @@ function hideClusterTooltip() { document.getElementById('clusterTooltip').classL
 function updateClusterLegend() { const lg=document.getElementById('clusterLegendInline'); if(selectedAttributes.length===0){const srcCounts={};CELL_TYPES.forEach(ct=>{const lbl=ct.sourceNomenclatureLabel||'Unknown';if(!srcCounts[lbl])srcCounts[lbl]={count:0,color:ct.sourceColor||'#667eea'};srcCounts[lbl].count++;});let h='';Object.entries(srcCounts).forEach(([lbl,info])=>{h+='<div class="legend-item-inline"><div class="legend-dot" style="background:'+info.color+';"></div><span>'+lbl+' ('+info.count+')</span></div>';});lg.innerHTML=h;return;} let html=''; selectedAttributes.forEach((a,i)=>{let label;if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);label=gene?gene.display:a;}else{label=ATTR_SHORT[a]||a;}html+=`<div class="legend-item-inline"><div class="legend-dot" style="background:${ATTR_COLORS[i%ATTR_COLORS.length]};"></div><span>${label}</span></div>`;}); if(selectedAttributes.length>=2){html+='<div class="legend-item-inline"><div class="legend-dot" style="background:#FFD700;border:2px solid #FFA500;box-shadow:0 0 4px #FFD700;"></div><span>All (intersection)</span></div>';} html+='<div class="legend-item-inline"><div class="legend-dot" style="background:#555;"></div><span>None</span></div>'; lg.innerHTML=html; }
 function updateClusterStats() { 
     const st=document.getElementById('clusterStatsInline'); 
-    let html=`<div class="stat-item"><span class="stat-label">Total:</span><span class="stat-value">${CELL_TYPES.length}</span></div>`; 
+    let html=`<div class="stat-item"><span class="stat-label">Total:</span><span class="stat-value">${clusterNodes?clusterNodes.length:CELL_TYPES.length}</span></div>`; 
     if(selectedAttributes.length>0){
         selectedAttributes.slice(0,4).forEach((a,i)=>{
-            const matchingCells = CELL_TYPES.filter(ct=>cellMatchesAttr(ct,a));
+            const pool=clusterNodes||CELL_TYPES;
+            const matchingCells = pool.filter(ct=>cellMatchesAttr(ct,a));
             const c=matchingCells.length;
-            
+
             if(a.startsWith('gene_')) {
-                
+
             }
             let label;
             if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);label=gene?gene.display:a;}else{label=ATTR_SHORT[a]||a;}
             html+=`<div class="stat-item"><span class="stat-label">${label}:</span><span class="stat-value" style="color:${ATTR_COLORS[i%ATTR_COLORS.length]};">${c}</span></div>`;
         });
         if(selectedAttributes.length>=2){
-            const ic=CELL_TYPES.filter(ct=>selectedAttributes.every(a=>cellMatchesAttr(ct,a))).length;
+            const pool=clusterNodes||CELL_TYPES;
+            const ic=pool.filter(ct=>selectedAttributes.every(a=>cellMatchesAttr(ct,a))).length;
             
             html+=`<div class="stat-item"><span class="stat-label">All:</span><span class="stat-value" style="color:#FFD700;text-shadow:0 0 4px #FFA500;">${ic}</span></div>`;
         }
@@ -1216,46 +1913,48 @@ function getAssertedRelationships(cellIdx) {
     // Get direct mapsTo (equivalences)
     if (ct.mapsTo && ct.mapsTo.length > 0) {
         ct.mapsTo.forEach(m => {
-            if (!m.label) return;
-            const targetIdx = CELL_TYPES.findIndex(c => c.entity === m.label);
+            if (!m.label && !m.id) return;
+            const targetIdx = m.id ? (ID_INDEX[m.id] ?? -1) : CELL_TYPES.findIndex(c => c.entity === m.label);
             if (targetIdx !== -1) {
-                result.equivalences.push({ label: CELL_TYPES[targetIdx].preferredLabel, idx: targetIdx, direction: 'to' });
+                result.equivalences.push({ label: CELL_TYPES[targetIdx].preferredLabel, idx: targetIdx, id: CELL_TYPES[targetIdx].id, direction: 'to' });
             }
         });
     }
-    
+
     // Find cells that map TO this cell (reverse equivalences)
     CELL_TYPES.forEach((other, otherIdx) => {
         if (otherIdx === cellIdx) return;
         if (other.mapsTo && other.mapsTo.length > 0) {
             other.mapsTo.forEach(m => {
-                if (m.label === ct.entity) {
+                const matches = (m.id && ct.id) ? m.id === ct.id : m.label === ct.entity;
+                if (matches) {
                     if (!result.equivalences.find(r => r.idx === otherIdx)) {
-                        result.equivalences.push({ label: other.preferredLabel, idx: otherIdx, direction: 'from' });
+                        result.equivalences.push({ label: other.preferredLabel, idx: otherIdx, id: other.id, direction: 'from' });
                     }
                 }
             });
         }
     });
-    
+
     // Get direct assertedSubclassOf (this cell is a subtype of...)
     if (ct.assertedSubclassOf && ct.assertedSubclassOf.length > 0) {
         ct.assertedSubclassOf.forEach(s => {
-            if (!s.label) return;
-            const targetIdx = CELL_TYPES.findIndex(c => c.entity === s.label);
+            if (!s.label && !s.id) return;
+            const targetIdx = s.id ? (ID_INDEX[s.id] ?? -1) : CELL_TYPES.findIndex(c => c.entity === s.label);
             if (targetIdx !== -1) {
-                result.subtypeOf.push({ label: CELL_TYPES[targetIdx].preferredLabel, idx: targetIdx });
+                result.subtypeOf.push({ label: CELL_TYPES[targetIdx].preferredLabel, idx: targetIdx, id: CELL_TYPES[targetIdx].id });
             }
         });
     }
-    
+
     // Find cells that are subtypes OF this cell (reverse)
     CELL_TYPES.forEach((other, otherIdx) => {
         if (otherIdx === cellIdx) return;
         if (other.assertedSubclassOf && other.assertedSubclassOf.length > 0) {
             other.assertedSubclassOf.forEach(s => {
-                if (s.label === ct.entity) {
-                    result.hasSubtypes.push({ label: other.preferredLabel, idx: otherIdx });
+                const matches = (s.id && ct.id) ? s.id === ct.id : s.label === ct.entity;
+                if (matches) {
+                    result.hasSubtypes.push({ label: other.preferredLabel, idx: otherIdx, id: other.id });
                 }
             });
         }
@@ -1275,13 +1974,12 @@ function renderLineageView() {
     svg.selectAll('*').remove();
     
     const sourceColors = {
-        'CSA paper': '#667eea',
-        'big DRG paper': '#f59e0b',
+        'Bhuiyan et al., 2024': '#667eea',
+        'Bhuiyan et al., 2025': '#f59e0b',
         'Tavares-Ferreira et al., 2022': '#22c55e',
         'Yu et al., 2024': '#ef4444',
         'Krauter et al., 2025': '#8b5cf6',
         'Qi et al., 2024': '#06b6d4',
-        'Kupari et al., 2021': '#ec4899'
     };
     
     const LINE_COLORS = {
@@ -1291,38 +1989,26 @@ function renderLineageView() {
     };
     
     // --- Helpers ---
-    // TODO: When unique identifiers (e.g., URIs or NPO IDs) are created for each cell,
-    // replace labelToIdx / csaLabelToIdx with a mapping keyed by the unique ID instead
-    // of preferredLabel. This will eliminate collisions where different cells share the
-    // same preferredLabel (e.g., "DRG Rxfp1 mouse neuron" exists in both CSA and Krauter).
-    // The csaLabelToIdx workaround below is a temporary fix for that collision.
-    const labelToIdx = {};
-    const entityToIdx = {};
-    const csaLabelToIdx = {};
-    CELL_TYPES.forEach((ct, idx) => {
-        labelToIdx[ct.preferredLabel] = idx;
-        if (ct.entity) entityToIdx[ct.entity] = idx;
-        if (ct.sourceNomenclatureLabel === 'CSA paper') csaLabelToIdx[ct.preferredLabel] = idx;
-    });
-    function resolveLabel(lbl) {
-        if (labelToIdx[lbl] !== undefined) return labelToIdx[lbl];
-        if (entityToIdx[lbl] !== undefined) return entityToIdx[lbl];
+    function resolveRef(rel) {
+        if (rel.id && ID_INDEX[rel.id] !== undefined) return ID_INDEX[rel.id];
         return null;
     }
-    
+
     function getResolvedConnections(ct) {
         const conns = [];
         if (ct.assertedSubclassOf) {
             ct.assertedSubclassOf.forEach(s => {
-                if (!s.label || s.label === 'added' || s.label.startsWith('-->')) return;
-                const ti = resolveLabel(s.label);
+                if (!s.label && !s.id) return;
+                if (s.label === 'added' || (s.label && s.label.startsWith('-->'))) return;
+                const ti = resolveRef(s);
                 if (ti !== null) conns.push({ targetIdx: ti, type: 'subtype' });
             });
         }
         if (ct.mapsTo) {
             ct.mapsTo.forEach(m => {
-                if (!m.label || m.label === 'added' || m.label.startsWith('-->')) return;
-                const ti = resolveLabel(m.label);
+                if (!m.label && !m.id) return;
+                if (m.label === 'added' || (m.label && m.label.startsWith('-->'))) return;
+                const ti = resolveRef(m);
                 if (ti !== null && !conns.find(c => c.targetIdx === ti))
                     conns.push({ targetIdx: ti, type: 'equiv' });
             });
@@ -1336,9 +2022,13 @@ function renderLineageView() {
         return { color: LINE_COLORS.subtype, dashed: false, double: false };
     }
     
-    // --- Categorise ---
+    // --- Categorise (exclude non-neuronal cells from lineage) ---
+    const isNeuron = ct => (ct.baseClass || 'neuron') === 'neuron';
     const masterFamilies = FAMILIES.map(fam => ({
-        name: fam.name, children: fam.children || []
+        name: fam.name, children: (fam.children || []).filter(ch => {
+            const idx = ch.id ? ID_INDEX[ch.id] : undefined;
+            return idx !== undefined && isNeuron(CELL_TYPES[idx]);
+        })
     }));
     masterFamilies.sort((a, b) => a.name.localeCompare(b.name));
     
@@ -1346,9 +2036,9 @@ function renderLineageView() {
     const csaToFamily = {};
     masterFamilies.forEach(fam => {
         csaByFamily[fam.name] = [];
-        fam.children.forEach(childLabel => {
-            // Prefer CSA-specific lookup so non-CSA cells with the same preferredLabel don't clobber
-            const idx = csaLabelToIdx[childLabel] !== undefined ? csaLabelToIdx[childLabel] : labelToIdx[childLabel];
+        fam.children.forEach(child => {
+            const childId = child.id || '';
+            const idx = childId ? ID_INDEX[childId] : undefined;
             if (idx !== undefined) {
                 csaByFamily[fam.name].push({ idx, ct: CELL_TYPES[idx] });
                 csaToFamily[idx] = fam.name;
@@ -1357,16 +2047,16 @@ function renderLineageView() {
     });
     
     const col3Sources = new Set(['Tavares-Ferreira et al., 2022', 'Yu et al., 2024',
-        'Krauter et al., 2025', 'Qi et al., 2024', 'Kupari et al., 2021']);
+        'Krauter et al., 2025', 'Qi et al., 2024']);
     
     // Build bigDRG → family mapping
     const bigDrgFamily = {};
     const bigDrgCsaConns = {};
     const bigDrgCol3Conns = {};
     CELL_TYPES.forEach((ct, idx) => {
-        if (ct.sourceNomenclatureLabel !== 'big DRG paper') return;
+        if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') return;
         const conns = getResolvedConnections(ct);
-        const csaConns = conns.filter(c => CELL_TYPES[c.targetIdx].sourceNomenclatureLabel === 'CSA paper');
+        const csaConns = conns.filter(c => CELL_TYPES[c.targetIdx].sourceNomenclatureLabel === 'Bhuiyan et al., 2024');
         const c3Conns = conns.filter(c => col3Sources.has(CELL_TYPES[c.targetIdx].sourceNomenclatureLabel));
         bigDrgCsaConns[idx] = csaConns;
         bigDrgCol3Conns[idx] = c3Conns;
@@ -1384,14 +2074,14 @@ function renderLineageView() {
         if (!col3Sources.has(ct.sourceNomenclatureLabel)) return;
         const conns = getResolvedConnections(ct);
         col3ToBigDrg[idx] = conns.filter(c =>
-            CELL_TYPES[c.targetIdx].sourceNomenclatureLabel === 'big DRG paper');
+            CELL_TYPES[c.targetIdx].sourceNomenclatureLabel === 'Bhuiyan et al., 2025');
         col3ToCol3[idx] = conns.filter(c =>
             col3Sources.has(CELL_TYPES[c.targetIdx].sourceNomenclatureLabel) && c.targetIdx !== idx);
     });
     
     // Also: bigDRG→col3 reversed into col3→bigDRG
     CELL_TYPES.forEach((ct, idx) => {
-        if (ct.sourceNomenclatureLabel !== 'big DRG paper') return;
+        if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') return;
         (bigDrgCol3Conns[idx] || []).forEach(c => {
             if (!col3ToBigDrg[c.targetIdx]) col3ToBigDrg[c.targetIdx] = [];
             if (!col3ToBigDrg[c.targetIdx].find(x => x.targetIdx === idx))
@@ -1444,7 +2134,7 @@ function renderLineageView() {
         // --- Collect bigDRG in this family ---
         const groupBigDrg = [];
         CELL_TYPES.forEach((ct, idx) => {
-            if (ct.sourceNomenclatureLabel !== 'big DRG paper') return;
+            if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') return;
             if (bigDrgFamily[idx] !== fam.name) return;
             groupBigDrg.push({ idx, ct, csaConns: bigDrgCsaConns[idx] || [] });
         });
@@ -1646,17 +2336,17 @@ function renderLineageView() {
     
     // --- Unplaced bigDRG (no CSA family link, e.g., cells 67, 71) ---
     const placedBigDrg = new Set(Object.keys(positions).filter(k => !k.includes('_')).map(Number)
-        .filter(idx => CELL_TYPES[idx]?.sourceNomenclatureLabel === 'big DRG paper'));
+        .filter(idx => CELL_TYPES[idx]?.sourceNomenclatureLabel === 'Bhuiyan et al., 2025'));
     const unplacedBigDrg = [];
     CELL_TYPES.forEach((ct, idx) => {
-        if (ct.sourceNomenclatureLabel === 'big DRG paper' && !placedBigDrg.has(idx))
+        if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025' && !placedBigDrg.has(idx))
             unplacedBigDrg.push({ idx, ct });
     });
     
     if (unplacedBigDrg.length > 0) {
         currentY += 16;
         connections.push({ _label: true, x: col2X, y: currentY - 6, 
-            text: 'No direct CSA link (' + unplacedBigDrg.length + ')' });
+            text: 'No direct Bhuiyan 2024 link (' + unplacedBigDrg.length + ')' });
         currentY += 4;
         
         // Treat each unplaced bigDRG as its own sub-group
@@ -1809,7 +2499,7 @@ function renderLineageView() {
     // Column headers
     const columns = [
         { x: col0X, width: col0Width, title: 'Master Cells', color: '#667eea' },
-        { x: col1X, width: col1Width, title: 'CSA Species Variants', color: '#667eea' },
+        { x: col1X, width: col1Width, title: 'Bhuiyan 2024 Variants', color: '#667eea' },
         { x: col2X, width: col2Width, title: 'Bhuiyan et al., 2025', color: '#f59e0b' },
         { x: col3X, width: col3Width, title: 'Other Sources', color: '#6b7280' }
     ];
@@ -1969,52 +2659,55 @@ function renderLineageView() {
 
 
 
-function showModal(idx) {
+function buildCellDetailHTML(idx, useLinks) {
     const ct=CELL_TYPES[idx];
-    document.getElementById('modalTitle').textContent=ct.preferredLabel;
     let relatedHtml='';
-    if(ct.relatedCells&&ct.relatedCells.length>0){relatedHtml=`<div class="detail-section"><h3>🔗 Related Species Variants</h3><div class="related-cells">${ct.relatedCells.map(rc=>`<button class="related-cell-btn" onclick="showModalByName('${rc.label.replace(/'/g,"\\'")}')">${rc.label}</button>`).join('')}</div></div>`;}
+    if(ct.relatedCells&&ct.relatedCells.length>0){
+        const relButtons = ct.relatedCells.map(rc => {
+            if (useLinks) {
+                const ri = rc.id ? (ID_INDEX[rc.id] ?? -1) : -1;
+                return ri !== -1 ? `<a href="#cell/${CELL_TYPES[ri].id}" class="related-cell-btn" onclick="event.stopPropagation();">${rc.label}</a>` : `<span class="related-cell-btn">${rc.label}</span>`;
+            }
+            return `<button class="related-cell-btn" onclick="openCellById('${rc.id}')">${rc.label}</button>`;
+        }).join('');
+        relatedHtml=`<div class="detail-section"><h3>🔗 Related Species Variants</h3><div class="related-cells">${relButtons}</div></div>`;
+    }
     let assertedHtml='';
     const relationships = getAssertedRelationships(idx);
     const hasAnyRelationship = relationships.equivalences.length > 0 || relationships.subtypeOf.length > 0 || relationships.hasSubtypes.length > 0;
-    
+
     if(hasAnyRelationship){
         let innerHtml = '';
-        
-        // Equivalences
         if(relationships.equivalences.length > 0) {
             const equivLinks = relationships.equivalences.map(r => {
                 const arrow = r.direction === 'to' ? '→' : '←';
-                const title = r.direction === 'to' ? 'Consistent with' : 'Consistenet with';
+                const title = r.direction === 'to' ? 'Consistent with' : 'Consistent with';
+                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn equiv-btn" title="${title}">${arrow} ${r.label}</a>`;
                 return `<button class="related-cell-btn equiv-btn" onclick="showModal(${r.idx})" title="${title}">${arrow} ${r.label}</button>`;
             }).join(' ');
             innerHtml += `<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">${equivLinks}</div></div>`;
         }
-        
-        // Subtype of
         if(relationships.subtypeOf.length > 0) {
-            const subtypeLinks = relationships.subtypeOf.map(r => 
-                `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↑ ${r.label}</button>`
-            ).join(' ');
+            const subtypeLinks = relationships.subtypeOf.map(r => {
+                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn">↑ ${r.label}</a>`;
+                return `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↑ ${r.label}</button>`;
+            }).join(' ');
             innerHtml += `<div class="asserted-subtype-section"><div class="asserted-label">Subtype of:</div><div class="related-cells">${subtypeLinks}</div></div>`;
         }
-        
-        // Has subtypes
         if(relationships.hasSubtypes.length > 0) {
-            const hasSubLinks = relationships.hasSubtypes.map(r => 
-                `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↓ ${r.label}</button>`
-            ).join(' ');
+            const hasSubLinks = relationships.hasSubtypes.map(r => {
+                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn">↓ ${r.label}</a>`;
+                return `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↓ ${r.label}</button>`;
+            }).join(' ');
             innerHtml += `<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">${hasSubLinks}</div></div>`;
         }
-        
         assertedHtml=`<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Proposed Relationships</div>${innerHtml}</div>`;
     }
     let mapsToHtml = assertedHtml;
-    const sourceLinkHtml=ct.sourceNomenclature?`<div class="detail-section"><h3>📚 Source Publication</h3><a href="${ct.sourceNomenclature}" target="_blank" class="source-link">${getSourceLinkText(ct)} ↗</a></div>`:'';
+    const sourceLinkHtml='';
     const sourceDataHtml = ct.sourceData && ct.sourceData.length > 0 ? `<div class="detail-section"><h3>📊 Source Data</h3>${ct.sourceData.map(sd => `<a href="${sd.uri}" target="_blank" class="source-link">${sd.label} ↗</a>`).join('<br>')}</div>` : '';
-    // PRECISION Atlas — Gene Distribution links for marker genes present in the PRECISION dataset
     let precisionHtml = '';
-    if (ct.sourceNomenclatureLabel === 'big DRG paper' && ct.markerGenes && ct.markerGenes.length > 0) {
+    if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025' && ct.markerGenes && ct.markerGenes.length > 0) {
         const seenGenes = new Set();
         const precisionMarkers = [];
         for (const g of ct.markerGenes) {
@@ -2034,10 +2727,75 @@ function showModal(idx) {
         }
     }
     const notesHtml = (ct.alertNotes && ct.alertNotes.length > 0) || (ct.curatorNotes && ct.curatorNotes.length > 0) ? `<div class="detail-section"><h3>📝 Notes</h3><div style="padding:0.5rem 0.75rem;background:#fef9c3;border:1px solid #eab308;border-radius:6px;font-size:0.9rem;line-height:1.5;">${ct.alertNotes && ct.alertNotes.length > 0 ? `<div style="margin-bottom:${ct.curatorNotes && ct.curatorNotes.length > 0 ? '1rem' : '0'};"><strong style="color:#b45309;">⚠️ Alert Notes:</strong>${ct.alertNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}${ct.curatorNotes && ct.curatorNotes.length > 0 ? `<div><strong style="color:#1e40af;">📋 Curator Notes:</strong>${ct.curatorNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}</div></div>` : '';
-    document.getElementById('modalBody').innerHTML=`<div class="detail-section"><p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
+    return `<div class="detail-section">${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as"><em>Also known as: ${ct.localLabel}</em></p>` : ''}<p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.subClassOf&&ct.subClassOf.length?`<p><strong>Subclass Of:</strong> ${ct.subClassOf.join(', ')}</p>`:''}${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}${ct.circuitRole?`<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>`:''}${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''}${g.expressionLevel?`<span class="method-badge expr-level">${g.expressionLevel}</span>`:''}${g.determinedBy?`<span class="method-badge">${g.determinedBy}</span>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype${ct.fiberTypeMethods?ct.fiberTypeMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology${ct.physiologyMethods?ct.physiologyMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
+}
+
+function buildRelatedSourceCellsHTML(idx) {
+    const ct = CELL_TYPES[idx];
+    const sourceCells = CELL_TYPES.map((c, i) => ({cell: c, idx: i}))
+        .filter(item => item.idx !== idx && item.cell.sourceNomenclatureLabel === ct.sourceNomenclatureLabel);
+    if (sourceCells.length === 0) return '';
+    return `<div class="detail-section"><h3>📋 Other cells from ${ct.sourceNomenclatureLabel} (${sourceCells.length})</h3><div class="related-source-cards-grid">${sourceCells.map(item => {
+        const c = item.cell;
+        const axonBadge = c.clusterAttributes.fiber_a_beta ? '<span class="card-badge axon">Aβ</span>' : c.clusterAttributes.fiber_a_delta ? '<span class="card-badge axon">Aδ</span>' : c.clusterAttributes.fiber_c ? '<span class="card-badge axon">C</span>' : '';
+        const rels = getAssertedRelationships(item.idx);
+        const hasAnyRel = rels.equivalences.length > 0 || rels.subtypeOf.length > 0 || rels.hasSubtypes.length > 0;
+        const equivBadge = hasAnyRel ? '<span class="card-badge equiv" title="Has proposed relationships">≡</span>' : '';
+        return `<a href="#cell/${c.id}" class="card-compact card-compact-link" style="border-left-color:${c.sourceColor||'#667eea'};text-decoration:none;color:inherit;display:block;margin-bottom:0;"><div class="card-compact-header" style="cursor:pointer;"><div class="card-compact-info"><div class="card-npokb-id">${c.id||''}</div><div class="card-compact-name">${c.preferredLabel}</div><div class="card-compact-meta">${c.species} · ${(c.somaLocations||[]).join(', ') || 'Unknown location'}</div></div><div class="card-compact-badges">${axonBadge}${equivBadge}</div></div></a>`;
+    }).join('')}</div></div>`;
+}
+
+function renderCellDetailView(idx) {
+    closeModal();
+    const ct = CELL_TYPES[idx];
+    const viewLabel = VIEW_NAMES[currentView] || 'previous view';
+    document.getElementById('cellDetailContent').innerHTML =
+        `<div class="cell-detail-page">` +
+            `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
+            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id">${ct.id||''}${(ct.baseClass||'neuron')!=='neuron'?'<span class="base-class-badge">Non-neuronal</span>':''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as" style="margin:-0.5rem 0 0.5rem;"><em>Also known as: ${ct.localLabel}</em></p>` : ''}${buildSourceLine(ct)}</div>` +
+            `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
+            buildRelatedSourceCellsHTML(idx) +
+        `</div>`;
+    document.getElementById('cellDetailViewContainer').style.display = 'block';
+    document.getElementById('cellDetailViewContainer').scrollTop = 0;
+    document.getElementById('cellDetailViewContainer').scrollIntoView({behavior: 'instant', block: 'start'});
+    ['cardViewContainer','treeViewContainer','synthesisViewContainer','clusterViewContainer','lineageViewContainer','compareViewContainer','alignViewContainer','concordanceViewContainer'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+    });
+    document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+}
+
+function handleHashChange() {
+    const hash = location.hash;
+    const match = hash.match(/^#cell\/(.+)$/);
+    if (match) {
+        const cellId = decodeURIComponent(match[1]);
+        const idx = ID_INDEX[cellId] ?? -1;
+        if (idx !== -1) {
+            renderCellDetailView(idx);
+        } else {
+            location.hash = '';
+        }
+    } else {
+        const detailContainer = document.getElementById('cellDetailViewContainer');
+        if (detailContainer && detailContainer.style.display !== 'none') {
+            detailContainer.style.display = 'none';
+            switchView(currentView);
+        }
+    }
+}
+
+function showModal(idx) {
+    const ct=CELL_TYPES[idx];
+    document.getElementById('modalTitle').textContent=ct.preferredLabel;
+    const detailLink = document.getElementById('modalDetailLink');
+    if (detailLink) {
+        detailLink.innerHTML = `<a href="#cell/${ct.id}" class="modal-detail-link">Open full detail</a><button class="modal-newtab-btn" onclick="window.open(location.pathname+location.search+'#cell/${ct.id}','_blank')" title="Open in new tab">↗</button>`;
+    }
+    document.getElementById('modalBody').innerHTML = buildCellDetailHTML(idx, false);
     document.getElementById('modal').classList.add('show');
 }
-function showModalByName(name) { const idx=CELL_TYPES.findIndex(ct=>ct.preferredLabel===name); if(idx!==-1)showModal(idx); }
+function openCellById(id) { const idx=ID_INDEX[id]; if(idx!==undefined)showModal(idx); }
 function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
 // ===== Permalink Utilities =====
@@ -2059,12 +2817,14 @@ function copyPermalink(paramsObj) {
 function copyCardLink() {
     const p = { view: 'cards' };
     const source = document.getElementById('filterSource').value;
+    const baseClass = document.getElementById('filterBaseClass').value;
     const species = document.getElementById('filterSpecies').value;
     const axon = document.getElementById('filterAxon').value;
     const location = document.getElementById('filterLocation').value;
     const gene = document.getElementById('filterGene').value;
     const equiv = document.getElementById('filterEquiv').value;
     if (source) p.source = source;
+    if (baseClass) p.baseClass = baseClass;
     if (species) p.species = species;
     if (axon) p.axon = axon;
     if (location) p.location = location;
@@ -2094,6 +2854,419 @@ function copyClusterLink() {
 
 function copyLineageLink() {
     copyPermalink({ view: 'lineage' });
+}
+
+function copyAlignLink() {
+    copyPermalink({ view: 'align' });
+}
+
+async function exportSourceReviewXlsx() {
+    if (typeof ExcelJS === 'undefined') {
+        alert('Excel export library not loaded. Please check your internet connection and reload the page.');
+        return;
+    }
+    try {
+        const wb = new ExcelJS.Workbook();
+        const doiMap = getSourceDOIMap();
+
+        const COLUMNS = [
+            { header: 'Status', width: 16, key: 'status' },
+            { header: 'Comments', width: 30, key: 'comments' },
+            { header: 'Local Label', width: 25, key: 'localLabel' },
+            { header: 'Species', width: 10, key: 'species' },
+            { header: 'Marker Genes', width: 45, key: 'genes' },
+            { header: 'Fiber Type', width: 32, key: 'fiberType' },
+            { header: 'Functional Phenotype', width: 32, key: 'functional' },
+            { header: 'Threshold Phenotype', width: 30, key: 'threshold' },
+            { header: 'Adaptation', width: 28, key: 'adaptation' },
+            { header: 'Cre Line', width: 32, key: 'creLine' },
+            { header: 'npokb ID', width: 13, key: 'npokbId' },
+        ];
+        const HEADER_ROW = 5;
+        const titleFont = { name: 'Arial', bold: true, size: 14, color: { argb: 'FF2d3748' } };
+        const doiFont = { name: 'Arial', size: 10, color: { argb: 'FF667eea' } };
+        const infoFont = { name: 'Arial', size: 10, color: { argb: 'FF718096' }, italic: true };
+        const dataFont = { name: 'Arial', size: 10 };
+
+        // Group cells by source
+        const sources = {};
+        CELL_TYPES.forEach(ct => {
+            const src = ct.sourceNomenclatureLabel;
+            if (!src) return;
+            if (!sources[src]) sources[src] = [];
+            sources[src].push(ct);
+        });
+
+        // Sort cells within each source by localLabel
+        for (const src in sources) {
+            sources[src].sort((a, b) => ((a.localLabel || a.preferredLabel) || '').localeCompare((b.localLabel || b.preferredLabel) || ''));
+        }
+
+        const sourceNames = Object.keys(sources).sort();
+
+        for (const srcName of sourceNames) {
+            const cellList = sources[srcName];
+            const sheetName = (CONCORDANCE_SOURCE_SHORT[srcName] || srcName).substring(0, 31);
+            const ws = wb.addWorksheet(sheetName);
+            const numCols = COLUMNS.length;
+
+            // DOI info
+            const doi = doiMap[srcName];
+            const doiUrl = doi ? doi.url : '';
+            const doiText = doiUrl ? doiUrl.replace(/^https?:\/\/doi\.org\//, '') : '';
+
+            // Row 1: Source name
+            ws.mergeCells(1, 1, 1, numCols);
+            const titleCell = ws.getCell('A1');
+            titleCell.value = `Source: ${srcName}`;
+            titleCell.font = titleFont;
+            titleCell.alignment = { vertical: 'middle' };
+
+            // Row 2: DOI
+            ws.mergeCells(2, 1, 2, numCols);
+            const doiCell = ws.getCell('A2');
+            doiCell.value = doiUrl ? { text: `DOI: ${doiText}`, hyperlink: doiUrl } : '';
+            doiCell.font = { ...doiFont, underline: true };
+
+            // Row 3: Info
+            ws.mergeCells(3, 1, 3, numCols);
+            const infoCell = ws.getCell('A3');
+            const today = new Date().toISOString().split('T')[0];
+            infoCell.value = `${cellList.length} cells  ·  Generated ${today}  ·  Please review each row and update the Status column`;
+            infoCell.font = infoFont;
+
+            // Row 4: spacer
+            ws.getRow(1).height = 24;
+            ws.getRow(4).height = 8;
+
+            // Row 5: Column headers
+            const headerRow = ws.getRow(HEADER_ROW);
+            COLUMNS.forEach((col, ci) => {
+                const cell = headerRow.getCell(ci + 1);
+                cell.value = col.header;
+                ws.getColumn(ci + 1).width = col.width;
+            });
+
+            // Data rows
+            cellList.forEach((ct, ri) => {
+                const rowNum = HEADER_ROW + 1 + ri;
+                const row = ws.getRow(rowNum);
+                row.getCell(1).value = 'Needs Review';
+                row.getCell(1).font = dataFont;
+                // Column 2 (Comments) left blank
+                row.getCell(3).value = ct.localLabel || ct.preferredLabel || '';
+                row.getCell(3).font = dataFont;
+                row.getCell(4).value = ct.species || '';
+                row.getCell(4).font = dataFont;
+                row.getCell(5).value = ct.geneExpressionString || '';
+                row.getCell(5).font = dataFont;
+                row.getCell(6).value = ct.fiberTypeString || '';
+                row.getCell(6).font = dataFont;
+                row.getCell(7).value = ct.functionalString || '';
+                row.getCell(7).font = dataFont;
+                row.getCell(8).value = ct.thresholdString || '';
+                row.getCell(8).font = dataFont;
+                row.getCell(9).value = ct.adaptationString || '';
+                row.getCell(9).font = dataFont;
+                row.getCell(10).value = ct.creLine || '';
+                row.getCell(10).font = dataFont;
+                row.getCell(11).value = ct.id || '';
+                row.getCell(11).font = dataFont;
+            });
+
+            const lastRow = HEADER_ROW + cellList.length;
+
+            // Data validation: Status dropdown
+            for (let r = HEADER_ROW + 1; r <= lastRow; r++) {
+                ws.getCell(r, 1).dataValidation = {
+                    type: 'list',
+                    allowBlank: false,
+                    formulae: ['"Needs Review,Reviewed,Corrected"'],
+                    showErrorMessage: true,
+                    errorTitle: 'Invalid Status',
+                    error: 'Please select: Needs Review, Reviewed, or Corrected'
+                };
+            }
+
+            // Conditional formatting: Status colors
+            const statusRange = `A${HEADER_ROW + 1}:A${lastRow}`;
+            ws.addConditionalFormatting({
+                ref: statusRange,
+                rules: [
+                    { type: 'cellIs', operator: 'equal', formulae: ['"Needs Review"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEF3C7' } } }, priority: 1 },
+                    { type: 'cellIs', operator: 'equal', formulae: ['"Reviewed"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFD1FAE5' } } }, priority: 2 },
+                    { type: 'cellIs', operator: 'equal', formulae: ['"Corrected"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEE2E2' } } }, priority: 3 },
+                ]
+            });
+
+            // Auto-filter
+            ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: lastRow, column: numCols } };
+
+            // Freeze panes: lock columns A-C and header rows
+            ws.views = [{ state: 'frozen', xSplit: 3, ySplit: HEADER_ROW }];
+        }
+
+        // Save
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'NervoSensus_Source_Review.xlsx';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Export failed:', err);
+        alert('Export failed: ' + err.message);
+    }
+}
+
+async function exportAlignDocx() {
+    if (typeof docx === 'undefined') {
+        alert('Document export library not loaded. Please check your internet connection and reload the page.');
+        return;
+    }
+    try {
+        const D = docx;
+        const baseUrl = window.location.href.split('?')[0].split('#')[0];
+        const doiMap = getSourceDOIMap();
+
+        // Source color map (strip # for docx hex)
+        const sourceColorMap = {};
+        CELL_TYPES.forEach(ct => {
+            if (ct.sourceNomenclatureLabel && ct.sourceColor)
+                sourceColorMap[ct.sourceNomenclatureLabel] = ct.sourceColor.replace('#', '');
+        });
+
+        // Build align data (same logic as renderAlignView)
+        const bigDrgCells = [];
+        CELL_TYPES.forEach((ct, idx) => {
+            if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025')
+                bigDrgCells.push({ ...ct, origIdx: idx });
+        });
+
+        const parentRows = [];
+        bigDrgCells.forEach(parentCt => {
+            const rels = getAssertedRelationships(parentCt.origIdx);
+            const children = [];
+            [...rels.equivalences, ...rels.subtypeOf, ...rels.hasSubtypes].forEach(r => {
+                if (r.idx !== parentCt.origIdx && CELL_TYPES[r.idx].sourceNomenclatureLabel !== 'Bhuiyan et al., 2025') {
+                    if (!children.find(c => c.origIdx === r.idx))
+                        children.push({ ...CELL_TYPES[r.idx], origIdx: r.idx });
+                }
+            });
+            children.sort((a, b) => (a.sourceNomenclatureLabel || '').localeCompare(b.sourceNomenclatureLabel || ''));
+            parentRows.push({ parent: parentCt, children });
+        });
+
+        const withChildren = parentRows.filter(r => r.children.length > 0)
+            .sort((a, b) => a.parent.preferredLabel.localeCompare(b.parent.preferredLabel));
+        const withoutChildren = parentRows.filter(r => r.children.length === 0)
+            .sort((a, b) => a.parent.preferredLabel.localeCompare(b.parent.preferredLabel));
+        const sortedRows = [...withChildren, ...withoutChildren];
+        const totalRelated = sortedRows.reduce((sum, r) => sum + r.children.length, 0);
+
+        // Columns: Cell Type, Source, Marker Genes, Aβ, Aδ, C, LTM, HTM, Temp, Proprio, RA, SA, Species
+        const colDefs = [
+            { label: 'Cell Type', width: 28 },
+            { label: 'Source', width: 14 },
+            { label: 'Marker Genes', width: 16 },
+            { label: 'Aβ', width: 4 },
+            { label: 'Aδ', width: 4 },
+            { label: 'C', width: 4 },
+            { label: 'LTM', width: 5 },
+            { label: 'HTM', width: 5 },
+            { label: 'Temp', width: 6 },
+            { label: 'Proprio', width: 6 },
+            { label: 'RA', width: 4 },
+            { label: 'SA', width: 4 },
+        ];
+        const totalPct = colDefs.reduce((s, c) => s + c.width, 0);
+
+        function boolCell(val) {
+            return new D.TableCell({
+                children: [new D.Paragraph({
+                    alignment: D.AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+                    children: [new D.TextRun({ text: val ? '✓' : '—', size: 16, font: 'Arial',
+                        color: val ? '22c55e' : 'cbd5e0' })]
+                })],
+                width: { size: Math.round(colDefs[3].width / totalPct * 100), type: D.WidthType.PERCENTAGE },
+                verticalAlign: D.VerticalAlign.CENTER
+            });
+        }
+
+        function makeCellLink(ct, isParent) {
+            const label = ct.localLabel || ct.preferredLabel;
+            const href = baseUrl + '?detail=' + encodeURIComponent(ct.id || '');
+            return new D.ExternalHyperlink({
+                link: href,
+                children: [new D.TextRun({
+                    text: (isParent ? '' : '    ') + label,
+                    size: isParent ? 18 : 16,
+                    bold: isParent,
+                    font: 'Arial',
+                    color: isParent ? '1a202c' : '4a5568',
+                    underline: { type: D.UnderlineType.SINGLE, color: isParent ? '1a202c' : '667eea' }
+                })]
+            });
+        }
+
+        function buildRow(ct, isParent) {
+            const ca = ct.clusterAttributes || {};
+            const srcColor = sourceColorMap[ct.sourceNomenclatureLabel] || '718096';
+            const srcShort = CONCORDANCE_SOURCE_SHORT[ct.sourceNomenclatureLabel] || ct.sourceNomenclatureLabel || '';
+            const genes = getMarkerGeneNames(ct);
+            const temp = getAlignTemperature(ct);
+
+            const pctW = (i) => Math.round(colDefs[i].width / totalPct * 100);
+            const cells = [
+                // Cell Type (hyperlinked)
+                new D.TableCell({
+                    children: [new D.Paragraph({
+                        spacing: { before: 20, after: 20 },
+                        children: [makeCellLink(ct, isParent)]
+                    })],
+                    width: { size: pctW(0), type: D.WidthType.PERCENTAGE },
+                    shading: isParent ? { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' } : undefined
+                }),
+                // Source
+                new D.TableCell({
+                    children: [new D.Paragraph({
+                        spacing: { before: 20, after: 20 },
+                        children: [new D.TextRun({ text: srcShort, size: 14, font: 'Arial', color: srcColor })]
+                    })],
+                    width: { size: pctW(1), type: D.WidthType.PERCENTAGE },
+                    shading: isParent ? { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' } : undefined
+                }),
+                // Marker Genes
+                new D.TableCell({
+                    children: [new D.Paragraph({
+                        spacing: { before: 20, after: 20 },
+                        children: [new D.TextRun({ text: genes || '—', size: 14, font: 'Arial', color: genes ? '2d3748' : 'cbd5e0' })]
+                    })],
+                    width: { size: pctW(2), type: D.WidthType.PERCENTAGE },
+                    shading: isParent ? { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' } : undefined
+                }),
+            ];
+            // Boolean columns
+            const boolKeys = ['fiber_a_beta', 'fiber_a_delta', 'fiber_c', 'mechanosensitive_ltm', 'mechanosensitive_htm'];
+            boolKeys.forEach((key, i) => {
+                const c = boolCell(ca[key]);
+                if (isParent) c.shading = { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' };
+                cells.push(c);
+            });
+            // Temperature
+            cells.push(new D.TableCell({
+                children: [new D.Paragraph({
+                    alignment: D.AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+                    children: [new D.TextRun({ text: temp || '—', size: 14, font: 'Arial', color: temp ? '2d3748' : 'cbd5e0' })]
+                })],
+                width: { size: pctW(9), type: D.WidthType.PERCENTAGE },
+                shading: isParent ? { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' } : undefined
+            }));
+            // Proprio, RA, SA
+            ['proprioceptive', 'rapidly_adapting', 'slowly_adapting'].forEach(key => {
+                const c = boolCell(ca[key]);
+                if (isParent) c.shading = { fill: 'f1f5f9', type: D.ShadingType.CLEAR, color: 'auto' };
+                cells.push(c);
+            });
+
+            return new D.TableRow({ children: cells });
+        }
+
+        // Header row
+        const headerCells = colDefs.map((col, i) => new D.TableCell({
+            children: [new D.Paragraph({
+                alignment: D.AlignmentType.CENTER, spacing: { before: 20, after: 20 },
+                children: [new D.TextRun({ text: col.label, bold: true, size: 16, color: 'FFFFFF', font: 'Arial' })]
+            })],
+            shading: { fill: '4a5568', type: D.ShadingType.CLEAR, color: 'auto' },
+            width: { size: Math.round(col.width / totalPct * 100), type: D.WidthType.PERCENTAGE }
+        }));
+        const headerRow = new D.TableRow({ children: headerCells, tableHeader: true });
+
+        // Build all data rows
+        const dataRows = [];
+        sortedRows.forEach(({ parent, children }) => {
+            dataRows.push(buildRow(parent, true));
+            children.forEach(child => dataRows.push(buildRow(child, false)));
+        });
+
+        // Source DOI references
+        const sourceNames = Object.keys(doiMap).sort();
+        const sourceParas = sourceNames.map(name => {
+            const { url, color } = doiMap[name];
+            const doi = extractDOI(url);
+            const hexColor = color.replace('#', '');
+            const children = [new D.TextRun({ text: name, bold: true, size: 16, font: 'Arial', color: hexColor })];
+            if (doi) {
+                children.push(new D.TextRun({ text: '  ·  ', size: 16, font: 'Arial', color: 'cbd5e0' }));
+                children.push(new D.ExternalHyperlink({
+                    link: url,
+                    children: [new D.TextRun({ text: doi, size: 16, font: 'Arial', color: '667eea', underline: { type: D.UnderlineType.SINGLE, color: '667eea' } })]
+                }));
+            }
+            return new D.Paragraph({ spacing: { before: 20, after: 20 }, children });
+        });
+
+        // Build document
+        const doc = new D.Document({
+            sections: [{
+                properties: {
+                    page: {
+                        size: { orientation: D.PageOrientation.LANDSCAPE, width: 16838, height: 11906 },
+                        margin: { top: 720, bottom: 720, left: 720, right: 720 }
+                    }
+                },
+                children: [
+                    new D.Paragraph({
+                        spacing: { after: 100 },
+                        children: [new D.TextRun({ text: 'NervoSensus — Cross-Source Alignment', bold: true, size: 32, font: 'Arial', color: '2d3748' })]
+                    }),
+                    new D.Paragraph({
+                        spacing: { after: 60 },
+                        children: [new D.TextRun({
+                            text: `${bigDrgCells.length} Big DRG anchor cells · ${totalRelated} related cells from other sources · Generated ${new Date().toISOString().split('T')[0]}`,
+                            size: 18, font: 'Arial', color: '718096', italics: true
+                        })]
+                    }),
+                    ...sourceParas,
+                    new D.Paragraph({ spacing: { before: 100, after: 100 } }),
+                    new D.Table({
+                        rows: [headerRow, ...dataRows],
+                        width: { size: 100, type: D.WidthType.PERCENTAGE },
+                        layout: D.TableLayoutType.FIXED
+                    }),
+                    new D.Paragraph({ spacing: { before: 200 } }),
+                    new D.Paragraph({
+                        children: [
+                            new D.TextRun({ text: 'Explore interactively: ', size: 18, font: 'Arial', color: '718096' }),
+                            new D.ExternalHyperlink({
+                                link: baseUrl + '?view=align',
+                                children: [new D.TextRun({ text: 'NervoSensus Align View', size: 18, font: 'Arial', color: '667eea', underline: { type: D.UnderlineType.SINGLE, color: '667eea' } })]
+                            })
+                        ]
+                    })
+                ]
+            }]
+        });
+
+        const buffer = await D.Packer.toBlob(doc);
+        const url = URL.createObjectURL(buffer);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'NervoSensus_Alignment.docx';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Export failed:', err);
+        alert('Export failed: ' + err.message);
+    }
+}
+
+function copyCellDetailLink() {
+    const url = window.location.href.split('?')[0].split('#')[0] + location.hash;
+    navigator.clipboard.writeText(url).then(() => showPermalinkToast());
 }
 
 // ===== Compare View =====
@@ -2270,25 +3443,10 @@ function buildCompareDetailHTML(anchorIdx) {
     const phenotypeRows = [
         { label: 'Species', key: 'species', getValue: ct => ct.species || '—' },
         { label: 'Soma Location', key: 'soma', getValue: ct => (ct.somaLocations && ct.somaLocations.length) ? ct.somaLocations.join(', ') : (ct.somaLocation || '—') },
-        { label: 'Functional Phenotype', key: 'physiology', getValue: ct => ct.physiologyString || '—' },
         { label: 'Axon Phenotype', key: 'axon', getValue: ct => ct.fiberTypeString || '—' },
-        { label: 'Threshold Phenotype', key: 'threshold', getValue: ct => {
-            if (!ct.clusterAttributes) return '—';
-            const flags = [];
-            if (ct.clusterAttributes.cold_sensitive) flags.push('cold sensitive');
-            if (ct.clusterAttributes.heat_sensitive) flags.push('heat sensitive');
-            if (ct.clusterAttributes.mechanosensitive_ltm) flags.push('LTM');
-            if (ct.clusterAttributes.mechanosensitive_htm) flags.push('HTM');
-            if (ct.clusterAttributes.proprioceptive) flags.push('proprioceptive');
-            return flags.length ? flags.join(', ') : '—';
-        }},
-        { label: 'Adaptation Phenotype', key: 'adaptation', getValue: ct => {
-            if (!ct.clusterAttributes) return '—';
-            const flags = [];
-            if (ct.clusterAttributes.rapidly_adapting) flags.push('rapidly adapting');
-            if (ct.clusterAttributes.slowly_adapting) flags.push('slowly adapting');
-            return flags.length ? flags.join(', ') : '—';
-        }},
+        { label: 'Functional Phenotype', key: 'physiology', getValue: ct => ct.functionalString || '—' },
+        { label: 'Threshold Phenotype', key: 'threshold', getValue: ct => ct.thresholdString || '—' },
+        { label: 'Adaptation Phenotype', key: 'adaptation', getValue: ct => ct.adaptationString || '—' },
         { label: 'Marker Genes', key: 'genes', getValue: ct => {
             if (!ct.markerGenes || !ct.markerGenes.length) return '—';
             return ct.markerGenes.map(g => g.name).join(', ');
@@ -2427,6 +3585,8 @@ function renderCompareView(anchorPreset, comparePreset) {
         anchorSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
         if (anchorPreset && sources.includes(anchorPreset)) {
             anchorSelect.value = anchorPreset;
+        } else if (sources.includes('Bhuiyan et al., 2025')) {
+            anchorSelect.value = 'Bhuiyan et al., 2025';
         }
         anchorSelect.addEventListener('change', () => {
             // Clear compare selectors and rebuild
@@ -2461,20 +3621,62 @@ function renderCompareView(anchorPreset, comparePreset) {
     updateCompareTable();
 }
 
+function renderSourcesFooter() {
+    const footer = document.getElementById('sourcesFooter');
+    if (!footer) return;
+    const doiMap = getSourceDOIMap();
+    const sourceNames = Object.keys(doiMap).sort();
+    if (!sourceNames.length) { footer.innerHTML = ''; return; }
+    let html = '<div class="sources-footer-title">Sources</div><div class="sources-footer-list">';
+    sourceNames.forEach(name => {
+        const { url, color } = doiMap[name];
+        const doi = extractDOI(url);
+        html += `<div class="sources-footer-item"><span class="sources-footer-name" style="color:${color}">${name}</span>`;
+        if (doi) html += `<span class="sources-footer-sep">·</span><a class="sources-footer-doi" href="${url}" target="_blank">${doi}</a>`;
+        html += '</div>';
+    });
+    html += '</div>';
+    footer.innerHTML = html;
+}
+
+function updateVersionInfo() {
+    const el = document.getElementById('versionInfo');
+    if (!el) return;
+    const dv = typeof DATA_VERSION !== 'undefined' ? DATA_VERSION : null;
+    const parts = ['App v' + APP_VERSION];
+    if (dv) parts.push('Data v' + dv.version + ' (' + dv.date + ')');
+    el.textContent = parts.join(' · ');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    updateVersionInfo();
+    updateDataStatus();
+    renderSourcesFooter();
     renderCards();
     initGeneButtons();
     document.querySelectorAll('.view-btn').forEach(btn=>{btn.addEventListener('click',()=>switchView(btn.dataset.view));});
     document.getElementById('modal').addEventListener('click',(e)=>{if(e.target.id==='modal')closeModal();});
     document.getElementById('uploadModal').addEventListener('click',(e)=>{if(e.target.id==='uploadModal')closeUploadModal();});
     document.querySelectorAll('.cluster-controls .attr-btn').forEach(btn=>{btn.addEventListener('click',()=>handleAttrClick(btn));});
+    window.addEventListener('hashchange', handleHashChange);
 
     // Deep-link support: parse URL parameters to set view and filters
     // Example: ?view=cards&source=big+DRG+paper&species=mouse&axon=fiber_c&location=soma_drg&gene=Trpv1&equiv=yes&cell=CLTM1
     const params = new URLSearchParams(window.location.search);
-    if (params.toString()) {
+    const detailParam = params.get('detail');
+    if (detailParam) {
+        // Direct cell detail link (e.g. ?detail=npokb:1059) — used by docx export
+        const cellId = decodeURIComponent(detailParam);
+        const idx = ID_INDEX[cellId] ?? -1;
+        if (idx !== -1) {
+            renderCellDetailView(idx);
+        } else {
+            switchView('cluster');
+        }
+    } else if (params.toString()) {
         const view = params.get('view');
         const source = params.get('source');
+        const baseClass = params.get('baseClass');
         const species = params.get('species');
         const axon = params.get('axon');
         const location = params.get('location');
@@ -2484,13 +3686,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const atlasAnnotation = params.get('atlasannotation');
 
         // Switch view if specified (default to cards)
-        if (view && ['cards','tree','synthesis','cluster','lineage','compare'].includes(view)) {
+        if (view && ['cards','tree','synthesis','cluster','lineage','compare','align','concordance'].includes(view)) {
             if (view === 'compare') {
                 const anchor = params.get('anchor');
                 const compareParam = params.get('compare');
                 const compareSources = compareParam ? compareParam.split('|').map(s => s.trim()) : [];
                 switchView('compare');
                 renderCompareView(anchor, compareSources);
+            } else if (view === 'concordance') {
+                const anchor = params.get('anchor');
+                const compareParam = params.get('compare');
+                const compareSources = compareParam ? compareParam.split('|').map(s => s.trim()) : [];
+                switchView('concordance');
+                renderConcordanceView(anchor, compareSources);
             } else {
                 switchView(view);
             }
@@ -2536,6 +3744,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const opt = [...el.options].find(o => o.value.toLowerCase() === source.toLowerCase());
             if (opt) { el.value = opt.value; filtersApplied = true; }
         }
+        if (baseClass) {
+            const el = document.getElementById('filterBaseClass');
+            const opt = [...el.options].find(o => o.value === baseClass);
+            if (opt) { el.value = opt.value; filtersApplied = true; }
+        }
         if (species) {
             const el = document.getElementById('filterSpecies');
             const opt = [...el.options].find(o => o.value.toLowerCase() === species.toLowerCase());
@@ -2565,14 +3778,23 @@ document.addEventListener('DOMContentLoaded', () => {
             applyCardFilters();
         }
 
-        // Open a specific cell modal by preferred label or atlas annotation
+        // Open a specific cell modal by ID or atlas annotation
         if (cell) {
-            showModalByName(cell);
+            if (ID_INDEX[cell] !== undefined) openCellById(cell);
         } else if (atlasAnnotation) {
             const cellName = ATLAS_TO_CELL[atlasAnnotation];
             if (cellName) {
-                showModalByName(cellName);
+                const aidx = CELL_TYPES.findIndex(ct => ct.preferredLabel === cellName);
+                if (aidx !== -1) showModal(aidx);
             }
         }
+    } else {
+        // No URL params — show default view (cluster)
+        switchView('cluster');
+    }
+
+    // Handle initial hash (e.g. direct link to #cell/npokb:915)
+    if (location.hash.match(/^#cell\/.+$/)) {
+        handleHashChange();
     }
 });

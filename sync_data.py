@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import glob
+from datetime import date
 
 try:
     import openpyxl
@@ -36,20 +37,6 @@ SOURCE_COLORS = [
     '#06b6d4',  # Qi et al.
     '#ec4899',  # Kupari et al.
 ]
-
-TODO_HEADER = """\
-// TODO: Update the data schema for DEFAULT_CELL_TYPES to include NPO Property
-// and NPO Property Value fields. These should be preserved from the source data
-// so that they can be viewed and updated in the code if necessary.
-// Example addition to each cell type object:
-//   "npoProperty": "<NPO property name>",
-//   "npoPropertyValue": "<NPO property value>"
-//
-// TODO: When unique identifiers are assigned to each cell, update DEFAULT_FAMILIES
-// children arrays and all relationship references (mapsTo, assertedSubclassOf,
-// relatedCells) to use the unique ID rather than preferredLabel text. This will
-// fix collisions where multiple cells share the same preferredLabel string.
-"""
 
 
 # ---------------------------------------------------------------------------
@@ -78,19 +65,34 @@ def find_xlsx(project_dir):
     return candidates[0]
 
 
+CANONICAL_HEADERS = {
+    'neuron id': 'Neuron ID',
+    'npo property': 'NPO Property',
+    'property value label': 'Property Value Label',
+    'npo property value iri': 'NPO Property Value IRI',
+    'union set number': 'Union set number',
+    'nest intersection number': 'Nest intersection number',
+    'npokb id': 'npokb ID',
+    'proposed action': 'Proposed action',
+    'modifier': 'Modifier',
+    'determinedbymethod': 'determinedByMethod',
+}
+
+
 def read_excel(path):
-    """Read the 'forNervoSensus' sheet and return rows as list of dicts."""
+    """Read the data sheet and return rows as list of dicts."""
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
 
-    # Find the sheet (case-insensitive match)
+    # Find the sheet (case-insensitive match, try multiple known names)
     sheet_name = None
+    known_names = ['pnscellstonpo', 'fornervosensus']
     for name in wb.sheetnames:
-        if name.lower().replace(' ', '') == 'fornervosensus':
+        if name.lower().replace(' ', '') in known_names:
             sheet_name = name
             break
 
     if sheet_name is None:
-        print(f"ERROR: Sheet 'forNervoSensus' not found. Available: {wb.sheetnames}")
+        print(f"ERROR: No recognized sheet found. Available: {wb.sheetnames}")
         sys.exit(1)
 
     ws = wb[sheet_name]
@@ -98,7 +100,8 @@ def read_excel(path):
     headers = None
     for i, row in enumerate(ws.iter_rows(values_only=True)):
         if i == 0:
-            headers = [str(h).strip() if h else '' for h in row]
+            raw = [str(h).strip() if h else '' for h in row]
+            headers = [CANONICAL_HEADERS.get(h.lower(), h) for h in raw]
             continue
         if all(c is None for c in row):
             continue
@@ -120,23 +123,50 @@ def parse_npo_data(rows):
     # First pass: collect all data by neuron
     # ------------------------------------------------------------------
     neurons = {}  # neuron_id -> list of property dicts
+    neuron_npokb = {}  # neuron_id -> npokb:Id CURIE
+    neuron_base_class = {}  # neuron_id -> "neuron" or "cell"
+    skipped_dont_add = 0
+    errors = []
 
-    for row in rows:
+    for row_num, row in enumerate(rows, start=2):
         neuron_id = safe_str(row.get('Neuron ID'))
         npo_prop = safe_str(row.get('NPO Property'))
         value_label = row.get('Property Value Label')
         value_iri = row.get('NPO Property Value IRI')
-        union_num = row.get('Union set number')
+        union_num = row.get('Union set number') or row.get('')
         nest_num = row.get('Nest intersection number')
+        npokb_id = safe_str(row.get('npokb ID'))
+        proposed_action = safe_str(row.get('Proposed action'))
+        modifier = safe_str(row.get('Modifier'))
+        determined_by = safe_str(row.get('determinedByMethod'))
 
         if not neuron_id:
             continue
 
+        # Validate Proposed action: only blank or "don't add"
+        if proposed_action and proposed_action.lower() != "don't add":
+            errors.append(f"Row {row_num}: unexpected Proposed action '{proposed_action}' (Neuron ID: {neuron_id})")
+
+        if proposed_action.lower() == "don't add":
+            skipped_dont_add += 1
+            continue
+
+        # Validate npokb ID presence
+        if not npokb_id:
+            errors.append(f"Row {row_num}: missing npokb ID (Neuron ID: {neuron_id})")
+
         val = safe_str(value_label)
         iri = safe_str(value_iri)
 
+        if npokb_id and neuron_id:
+            neuron_npokb[neuron_id] = npokb_id
+
         if neuron_id not in neurons:
             neurons[neuron_id] = []
+
+        # Detect baseClass from NPO Property rows
+        if npo_prop == 'ilxtr:neurondmBaseClass' and val:
+            neuron_base_class[neuron_id] = val.lower()
 
         neurons[neuron_id].append({
             'npo': npo_prop,
@@ -144,47 +174,46 @@ def parse_npo_data(rows):
             'nest': nest_num,
             'value': val,
             'iri': iri,
+            'modifier': modifier,
+            'determinedBy': determined_by,
         })
 
+    if errors:
+        print(f"\nERROR: {len(errors)} data integrity issue(s) — ingest halted:")
+        for e in errors:
+            print(f"  {e}")
+        sys.exit(1)
+
+    print(f"  Rows skipped (don't add): {skipped_dont_add}")
+
     # ------------------------------------------------------------------
-    # Build master rdfsLabel → prefLabel mapping
+    # Build entity (rdfs:label) → npokb:Id mapping
     # ------------------------------------------------------------------
-    master_rdfs_to_pref = {}
-    master_pref_labels = {}
+    entity_to_npokb = {}
+    for nid, props in neurons.items():
+        npokb_id = neuron_npokb.get(nid, '')
+        for p in props:
+            if p['npo'] == 'rdfs:label' and p['value'] and npokb_id:
+                entity_to_npokb[p['value']] = npokb_id
+
+    # ------------------------------------------------------------------
+    # Build master cell npokb:Id set and prefLabel mapping
+    # ------------------------------------------------------------------
+    master_npokb_ids = set()
+    master_npokb_to_pref = {}  # npokb:Id -> prefLabel
 
     for nid, props in neurons.items():
         if 'master' not in nid.lower():
             continue
-        rdfs = ''
+        npokb_id = neuron_npokb.get(nid, '')
+        if npokb_id:
+            master_npokb_ids.add(npokb_id)
         pref = ''
         for p in props:
-            if p['npo'] == 'rdfs:label':
-                rdfs = p['value']
             if p['npo'] == 'skos:prefLabel':
                 pref = p['value']
-        if rdfs and pref:
-            master_rdfs_to_pref[rdfs] = pref
-        if pref:
-            master_pref_labels[nid] = pref
-
-    # ------------------------------------------------------------------
-    # Build subClassOf map (normalizing to prefLabel, preferring master-linked)
-    # ------------------------------------------------------------------
-    subclass_map = {}
-
-    for nid, props in neurons.items():
-        if 'master' in nid.lower():
-            continue
-        candidates = []
-        for p in props:
-            if p['npo'] == 'TEMP:subClassOf' and p['value']:
-                raw = p['value']
-                normalized = master_rdfs_to_pref.get(raw, raw)
-                is_master = raw in master_rdfs_to_pref
-                candidates.append({'normalized': normalized, 'is_master': is_master})
-        if candidates:
-            master_linked = next((c for c in candidates if c['is_master']), None)
-            subclass_map[nid] = master_linked['normalized'] if master_linked else candidates[0]['normalized']
+        if pref and npokb_id:
+            master_npokb_to_pref[npokb_id] = pref
 
     # ------------------------------------------------------------------
     # Collect sources
@@ -229,11 +258,15 @@ def parse_npo_data(rows):
         sc = source_color_map.get(source_url, {})
         source_color = sc.get('color', '#667eea')
 
+        base_class = neuron_base_class.get(nid, 'neuron')
+
         ct = {
+            'id': neuron_npokb.get(nid, ''),
             'entity': '',
             'preferredLabel': '',
+            'baseClass': base_class,
             'species': 'unknown',
-            'circuitRole': 'sensory',
+            'circuitRole': '',
             'neurotransmitter': '',
             'somaLocation': '',
             'somaLocations': [],
@@ -248,9 +281,12 @@ def parse_npo_data(rows):
             'fiberTypeStringAbbrev': '',
             'physiologyString': '',
             'physiologyStringAbbrev': '',
+            'thresholdString': '',
+            'adaptationString': '',
+            'functionalString': '',
             'creLine': '',
             'color': source_color,
-            'masterLabel': subclass_map.get(nid, ''),
+            'masterLabel': '',
             'relatedCells': [],
             'mapsTo': [],
             'assertedSubclassOf': [],
@@ -258,6 +294,8 @@ def parse_npo_data(rows):
             'alertNotes': [],
             'curatorNotes': [],
             'sourceData': [],
+            'localLabel': '',
+            'subClassOf': [],
             'clusterAttributes': {
                 'cold_sensitive': False,
                 'heat_sensitive': False,
@@ -295,6 +333,9 @@ def parse_npo_data(rows):
             elif npo == 'skos:prefLabel':
                 ct['preferredLabel'] = val
 
+            elif npo == 'ilxtr:localLabel':
+                ct['localLabel'] = val
+
             elif npo == 'ilxtr:hasInstanceInTaxon':
                 ct['species'] = val.lower()
                 sp_key = 'species_' + val.lower().replace(' ', '_')
@@ -327,7 +368,8 @@ def parse_npo_data(rows):
                 ct['creLine'] = val
 
             elif npo in ('TEMP:mapsTo', 'ilxtr:mapsTo'):
-                ct['mapsTo'].append({'label': val, 'iri': iri})
+                target_id = iri if iri.startswith('npokb:') else entity_to_npokb.get(val, '')
+                ct['mapsTo'].append({'label': val, 'iri': iri, 'id': target_id})
 
             elif npo in ('ilxtr:hasExpressionPhenotype',
                          'ilxtr:hasNucleicAcidExpressionPhenotype') and val:
@@ -336,7 +378,12 @@ def parse_npo_data(rows):
                 exp = parts[1] if len(parts) > 1 else ''
                 display = nm + '^' + exp if exp else nm
                 gene_items.append({'union': p['union'], 'nest': p['nest'], 'display': display})
-                ct['markerGenes'].append({'name': nm, 'uri': iri or '', 'expression': exp})
+                gene_entry = {'name': nm, 'uri': iri or '', 'expression': exp}
+                if p['determinedBy']:
+                    gene_entry['determinedBy'] = p['determinedBy']
+                if npo == 'ilxtr:hasNucleicAcidExpressionPhenotype' and p['modifier']:
+                    gene_entry['expressionLevel'] = p['modifier']
+                ct['markerGenes'].append(gene_entry)
                 base = nm.lower()
                 if base not in ct['geneBaseNames']:
                     ct['geneBaseNames'].append(base)
@@ -345,18 +392,24 @@ def parse_npo_data(rows):
                 gene_map[base]['cells'].append(ct['preferredLabel'])
 
             elif npo == 'ilxtr:hasAxonPhenotype' and val:
-                axon_items.append({'union': p['union'], 'nest': p['nest'], 'display': val})
+                item = {'union': p['union'], 'nest': p['nest'], 'display': val}
+                if p['determinedBy']:
+                    item['determinedBy'] = p['determinedBy']
+                axon_items.append(item)
                 vl = val.lower()
-                if 'beta' in vl or '(beta)' in vl:
+                if 'beta' in vl or '(beta)' in vl or 'β' in vl:
                     ct['clusterAttributes']['fiber_a_beta'] = True
-                if 'delta' in vl or '(delta)' in vl:
+                if 'delta' in vl or '(delta)' in vl or 'δ' in vl:
                     ct['clusterAttributes']['fiber_a_delta'] = True
                 if 'type c' in vl:
                     ct['clusterAttributes']['fiber_c'] = True
 
             elif npo in ('ilxtr:hasThresholdPhenotype',
                          'ilxtr:hasPredictedThresholdPhenotype') and val:
-                threshold_items.append({'union': p['union'], 'nest': p['nest'], 'display': val})
+                item = {'union': p['union'], 'nest': p['nest'], 'display': val}
+                if p['determinedBy']:
+                    item['determinedBy'] = p['determinedBy']
+                threshold_items.append(item)
                 vl = val.lower()
                 if 'ltm' in vl or 'low-threshold' in vl:
                     ct['clusterAttributes']['mechanosensitive_ltm'] = True
@@ -364,7 +417,10 @@ def parse_npo_data(rows):
                     ct['clusterAttributes']['mechanosensitive_htm'] = True
 
             elif npo == 'ilxtr:hasAdaptationPhenotype' and val:
-                adaptation_items.append({'union': p['union'], 'nest': p['nest'], 'display': val})
+                item = {'union': p['union'], 'nest': p['nest'], 'display': val}
+                if p['determinedBy']:
+                    item['determinedBy'] = p['determinedBy']
+                adaptation_items.append(item)
                 vl = val.lower()
                 if 'rapidly' in vl or '(ra)' in vl:
                     ct['clusterAttributes']['rapidly_adapting'] = True
@@ -372,7 +428,10 @@ def parse_npo_data(rows):
                     ct['clusterAttributes']['slowly_adapting'] = True
 
             elif npo == 'ilxtr:hasFunctionalPhenotype' and val:
-                functional_items.append({'union': p['union'], 'nest': p['nest'], 'display': val})
+                item = {'union': p['union'], 'nest': p['nest'], 'display': val}
+                if p['determinedBy']:
+                    item['determinedBy'] = p['determinedBy']
+                functional_items.append(item)
                 vl = val.lower()
                 if 'cold' in vl:
                     ct['clusterAttributes']['cold_sensitive'] = True
@@ -390,44 +449,81 @@ def parse_npo_data(rows):
             elif npo == 'ilxtr:dataCitation' and (val or iri):
                 ct['sourceData'].append({'label': val or iri, 'uri': iri or ''})
 
-            elif npo == 'TEMP:assertedSubClassOf':
-                ct['assertedSubclassOf'].append({'label': val, 'iri': iri})
+            elif npo in ('TEMP:subClassOf', 'TEMP:assertedSubClassOf'):
+                target_id = iri if iri.startswith('npokb:') else entity_to_npokb.get(val, '')
+                ct['assertedSubclassOf'].append({'label': val, 'iri': iri, 'id': target_id})
+
+            elif npo == 'ilxtr:subClassOf' and val:
+                if val not in ct['subClassOf']:
+                    ct['subClassOf'].append(val)
 
         # Build derived strings
         ct['geneExpressionString'] = ' + '.join(g['display'] for g in gene_items)
         ct['fiberTypeString'] = ' + '.join(a['display'] for a in axon_items)
         ct['fiberTypeStringAbbrev'] = ct['fiberTypeString']
 
+        # Collect determinedByMethod badges for axon phenotype
+        axon_methods = list(dict.fromkeys(a['determinedBy'] for a in axon_items if a.get('determinedBy')))
+        if axon_methods:
+            ct['fiberTypeMethods'] = axon_methods
+
+        ct['thresholdString'] = ', '.join(p['display'] for p in threshold_items)
+        ct['adaptationString'] = ', '.join(p['display'] for p in adaptation_items)
+        ct['functionalString'] = ', '.join(p['display'] for p in functional_items)
         all_phys = threshold_items + adaptation_items + functional_items
         ct['physiologyString'] = ' + '.join(p['display'] for p in all_phys)
         ct['physiologyStringAbbrev'] = ct['physiologyString']
 
+        # Collect determinedByMethod badges for physiology
+        phys_methods = list(dict.fromkeys(p['determinedBy'] for p in all_phys if p.get('determinedBy')))
+        if phys_methods:
+            ct['physiologyMethods'] = phys_methods
+
         if ct['somaLocations']:
             ct['somaLocation'] = ct['somaLocations'][0]
+
+        # Deduplicate markerGenes by base name (protein + RNA rows for same gene)
+        seen_genes = {}
+        deduped_genes = []
+        for g in ct['markerGenes']:
+            base = g['name'].lower()
+            if base in seen_genes:
+                existing = seen_genes[base]
+                if g.get('expressionLevel') and not existing.get('expressionLevel'):
+                    existing['expressionLevel'] = g['expressionLevel']
+                if g.get('determinedBy') and not existing.get('determinedBy'):
+                    existing['determinedBy'] = g['determinedBy']
+            else:
+                seen_genes[base] = g
+                deduped_genes.append(g)
+        ct['markerGenes'] = deduped_genes
 
         # Only include cells that have a preferredLabel
         if ct['preferredLabel']:
             cell_types.append(ct)
 
     # ------------------------------------------------------------------
-    # Build related cells
+    # Derive masterLabel and relatedCells from assertedSubclassOf triples
     # ------------------------------------------------------------------
     master_to_children = {}
     for ct in cell_types:
-        ml = ct['masterLabel']
-        if ml:
-            if ml not in master_to_children:
-                master_to_children[ml] = []
-            master_to_children[ml].append({
-                'label': ct['preferredLabel'],
-                'species': ct['species'],
-            })
+        for rel in ct['assertedSubclassOf']:
+            if rel['id'] in master_npokb_ids:
+                ct['masterLabel'] = master_npokb_to_pref.get(rel['id'], rel['label'])
+                if ct['masterLabel'] not in master_to_children:
+                    master_to_children[ct['masterLabel']] = []
+                master_to_children[ct['masterLabel']].append({
+                    'id': ct['id'],
+                    'label': ct['preferredLabel'],
+                    'species': ct['species'],
+                })
+                break
 
     for ct in cell_types:
         ml = ct['masterLabel']
         if ml and ml in master_to_children:
             ct['relatedCells'] = [
-                {'label': sib['label'], 'species': sib['species']}
+                {'id': sib['id'], 'label': sib['label'], 'species': sib['species']}
                 for sib in master_to_children[ml]
                 if sib['label'] != ct['preferredLabel']
             ]
@@ -447,6 +543,12 @@ def parse_npo_data(rows):
     # ------------------------------------------------------------------
     # Build families from master cells (preserving order from Excel)
     # ------------------------------------------------------------------
+    # Build preferredLabel → npokb:Id mapping for child lookups
+    pref_to_npokb = {}
+    for ct in cell_types:
+        if ct['preferredLabel'] and ct['id']:
+            pref_to_npokb[ct['preferredLabel']] = ct['id']
+
     families = []
     for nid, props in neurons.items():
         if 'master' not in nid.lower():
@@ -457,9 +559,9 @@ def parse_npo_data(rows):
                 pref_label = p['value']
         if not pref_label:
             continue
-        children = [c['label'] for c in master_to_children.get(pref_label, [])]
+        children = [{'id': c['id'], 'label': c['label']} for c in master_to_children.get(pref_label, [])]
         families.append({
-            'id': str(len(families) + 1),
+            'id': neuron_npokb.get(nid, ''),
             'name': pref_label,
             'children': children,
         })
@@ -471,18 +573,32 @@ def parse_npo_data(rows):
 # Write js/data.js
 # ---------------------------------------------------------------------------
 
-def write_data_js(out_path, families, cell_types, genes, source_color_map):
-    """Write the four constants to js/data.js."""
+DATA_VERSION = '0.1.0-beta'
 
-    # Convert Python booleans to JS-compatible JSON (true/false)
+def write_data_js(out_path, families, cell_types, genes, source_color_map, source_file):
+    """Write the data constants and version info to js/data.js."""
+
+    neuron_count = sum(1 for ct in cell_types if (ct.get('baseClass') or 'neuron') == 'neuron')
+    non_neuron_count = len(cell_types) - neuron_count
+
+    version_info = {
+        'version': DATA_VERSION,
+        'date': date.today().isoformat(),
+        'cellCount': len(cell_types),
+        'neuronCount': neuron_count,
+        'nonNeuronCount': non_neuron_count,
+        'sourceCount': len(source_color_map),
+        'sourceFile': os.path.basename(source_file),
+    }
+
     families_json = json.dumps(families, ensure_ascii=False, separators=(',', ':'))
     cells_json = json.dumps(cell_types, ensure_ascii=False, separators=(',', ':'))
     genes_json = json.dumps(genes, ensure_ascii=False, separators=(',', ':'))
     sources_json = json.dumps(source_color_map, ensure_ascii=False, separators=(',', ':'))
+    version_json = json.dumps(version_info, ensure_ascii=False, separators=(',', ':'))
 
     with open(out_path, 'w', encoding='utf-8') as f:
-        f.write(TODO_HEADER)
-        f.write('\n')
+        f.write(f'const DATA_VERSION = {version_json};\n')
         f.write(f'const DEFAULT_FAMILIES = {families_json};\n')
         f.write(f'const DEFAULT_CELL_TYPES = {cells_json};\n')
         f.write(f'const DEFAULT_GENES = {genes_json};\n')
@@ -518,9 +634,11 @@ def main():
     families, cell_types, genes, source_color_map = parse_npo_data(rows)
 
     # Summary
+    neuron_count = sum(1 for ct in cell_types if ct.get('baseClass', 'neuron') == 'neuron')
+    non_neuron_count = sum(1 for ct in cell_types if ct.get('baseClass', 'neuron') != 'neuron')
     print(f"\n--- Summary ---")
     print(f"  Families:    {len(families)}")
-    print(f"  Cell types:  {len(cell_types)}")
+    print(f"  Cell types:  {len(cell_types)} ({neuron_count} neurons + {non_neuron_count} non-neuronal)")
     print(f"  Genes:       {len(genes)}")
     print(f"  Sources:     {len(source_color_map)}")
     for url, sc in source_color_map.items():
@@ -541,7 +659,7 @@ def main():
 
     # Write output
     out_path = os.path.join(project_dir, 'js', 'data.js')
-    write_data_js(out_path, families, cell_types, genes, source_color_map)
+    write_data_js(out_path, families, cell_types, genes, source_color_map, xlsx_path)
 
     print(f"\nDone! {len(families)} families, {len(cell_types)} cells, "
           f"{len(genes)} genes, {len(source_color_map)} sources.")

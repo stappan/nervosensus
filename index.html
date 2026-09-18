@@ -19,6 +19,7 @@
             <div>
                 <h1>🧬 NervoSensus</h1>
                 <p class="subtitle">Interactive Sensory Neuron Cell Type Explorer</p>
+                <p class="version-info" id="versionInfo"></p>
             </div>
             <div class="upload-section">
                 <button class="upload-btn" onclick="showUploadModal()">📁 Load Data</button>
@@ -198,6 +199,15 @@
                 </div>
                 <div class="cluster-main">
                     <div class="cluster-controls" id="clusterControls">
+                        <div class="attr-group" style="margin-bottom:0.75rem;">
+                            <div class="attr-group-title" style="cursor:default;">Cell Type</div>
+                            <div class="attr-group-content expanded">
+                                <select id="clusterBaseClassFilter" class="filter-select" onchange="onClusterBaseClassChange()" style="width:100%;font-size:0.85rem;">
+                                    <option value="neuron">Neuron</option>
+                                    <option value="cell">Non-neuronal</option>
+                                </select>
+                            </div>
+                        </div>
                         <h3>Select Attributes</h3>
                         <div class="selected-attrs-display" id="selectedAttrsDisplay">No attributes selected</div>
                         <button class="clear-filters-btn" onclick="clearAllFilters()">✕ Clear All Filters</button>

@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import glob
+from datetime import date
 
 try:
     import openpyxl
@@ -396,9 +397,9 @@ def parse_npo_data(rows):
                     item['determinedBy'] = p['determinedBy']
                 axon_items.append(item)
                 vl = val.lower()
-                if 'beta' in vl or '(beta)' in vl:
+                if 'beta' in vl or '(beta)' in vl or 'β' in vl:
                     ct['clusterAttributes']['fiber_a_beta'] = True
-                if 'delta' in vl or '(delta)' in vl:
+                if 'delta' in vl or '(delta)' in vl or 'δ' in vl:
                     ct['clusterAttributes']['fiber_a_delta'] = True
                 if 'type c' in vl:
                     ct['clusterAttributes']['fiber_c'] = True
@@ -572,16 +573,32 @@ def parse_npo_data(rows):
 # Write js/data.js
 # ---------------------------------------------------------------------------
 
-def write_data_js(out_path, families, cell_types, genes, source_color_map):
-    """Write the four constants to js/data.js."""
+DATA_VERSION = '0.1.0-beta'
 
-    # Convert Python booleans to JS-compatible JSON (true/false)
+def write_data_js(out_path, families, cell_types, genes, source_color_map, source_file):
+    """Write the data constants and version info to js/data.js."""
+
+    neuron_count = sum(1 for ct in cell_types if (ct.get('baseClass') or 'neuron') == 'neuron')
+    non_neuron_count = len(cell_types) - neuron_count
+
+    version_info = {
+        'version': DATA_VERSION,
+        'date': date.today().isoformat(),
+        'cellCount': len(cell_types),
+        'neuronCount': neuron_count,
+        'nonNeuronCount': non_neuron_count,
+        'sourceCount': len(source_color_map),
+        'sourceFile': os.path.basename(source_file),
+    }
+
     families_json = json.dumps(families, ensure_ascii=False, separators=(',', ':'))
     cells_json = json.dumps(cell_types, ensure_ascii=False, separators=(',', ':'))
     genes_json = json.dumps(genes, ensure_ascii=False, separators=(',', ':'))
     sources_json = json.dumps(source_color_map, ensure_ascii=False, separators=(',', ':'))
+    version_json = json.dumps(version_info, ensure_ascii=False, separators=(',', ':'))
 
     with open(out_path, 'w', encoding='utf-8') as f:
+        f.write(f'const DATA_VERSION = {version_json};\n')
         f.write(f'const DEFAULT_FAMILIES = {families_json};\n')
         f.write(f'const DEFAULT_CELL_TYPES = {cells_json};\n')
         f.write(f'const DEFAULT_GENES = {genes_json};\n')
@@ -642,7 +659,7 @@ def main():
 
     # Write output
     out_path = os.path.join(project_dir, 'js', 'data.js')
-    write_data_js(out_path, families, cell_types, genes, source_color_map)
+    write_data_js(out_path, families, cell_types, genes, source_color_map, xlsx_path)
 
     print(f"\nDone! {len(families)} families, {len(cell_types)} cells, "
           f"{len(genes)} genes, {len(source_color_map)} sources.")

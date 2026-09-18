@@ -1,3 +1,5 @@
+const APP_VERSION = '0.1.0-beta';
+
 let SOURCES = JSON.parse(JSON.stringify(DEFAULT_SOURCES));
 
 let CELL_TYPES = JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES));
@@ -22,7 +24,7 @@ let ID_INDEX = buildIdIndex();
 
 let currentView = 'cluster';
 let treeGrouping = 'location';
-const AXON_LABELS = { 'type a nerve fiber': 'A fiber', 'type ab (beta) nerve fiber': 'Aβ fiber', 'type ad (delta) nerve fiber': 'Aδ fiber', 'type c nerve fiber': 'C fiber' };
+const AXON_LABELS = { 'type a nerve fiber': 'A fiber', 'type ab (beta) nerve fiber': 'Aβ fiber', 'type ad (delta) nerve fiber': 'Aδ fiber', 'type aβ nerve fiber': 'Aβ fiber', 'type aδ nerve fiber': 'Aδ fiber', 'type c nerve fiber': 'C fiber' };
 
 let selectedAttributes = [];
 let clusterSimulation = null;
@@ -637,38 +639,69 @@ function renderTreeView() {
     const neuronTypes = CELL_TYPES.filter(ct => (ct.baseClass || 'neuron') === 'neuron');
     const nonNeuronTypes = CELL_TYPES.filter(ct => (ct.baseClass || 'neuron') !== 'neuron');
 
+    function renderNonNeuronSubgroups(cells, parentId) {
+        const subgroups = {};
+        cells.forEach(ct => {
+            const subs = ct.subClassOf || [];
+            const groupLabel = subs.length > 0 ? subs[subs.length - 1] : 'Other';
+            if (!subgroups[groupLabel]) subgroups[groupLabel] = [];
+            subgroups[groupLabel].push(ct);
+        });
+        let nnHtml = '';
+        Object.entries(subgroups).forEach(([subName, subCells], si) => {
+            const uid = parentId + '-nn-' + si;
+            nnHtml += '<div class="tree-item"><div class="tree-master" onclick="toggleFamily(\'' + uid + '\')"><span class="tree-toggle" id="toggle-' + uid + '">▶</span><div style="display:inline-block;vertical-align:top;"><div class="tree-master-name">' + subName + '</div><div class="tree-master-count">' + subCells.length + ' cells</div></div></div><div class="tree-children" id="children-' + uid + '">';
+            subCells.forEach(ct => {
+                nnHtml += '<div class="tree-child" onclick="openCellById(\'' + ct.id + '\')"><div class="tree-child-name">' + ct.preferredLabel + '</div></div>';
+            });
+            nnHtml += '</div></div>';
+        });
+        return nnHtml;
+    }
+
     if (treeGrouping === 'location') {
         let groups = {};
-        neuronTypes.forEach(ct => {
+        CELL_TYPES.forEach(ct => {
             (ct.somaLocations || [ct.somaLocation || 'Unknown']).forEach(loc => {
                 if (!groups[loc]) groups[loc] = [];
                 if (!groups[loc].find(x => x.preferredLabel === ct.preferredLabel)) groups[loc].push(ct);
             });
         });
-        
-        Object.entries(groups).forEach(([groupName, cells]) => {
-            const fams = buildFamilies(cells);
+
+        Object.entries(groups).forEach(([groupName, allCells]) => {
+            const locNeurons = allCells.filter(ct => (ct.baseClass || 'neuron') === 'neuron');
+            const locNonNeurons = allCells.filter(ct => (ct.baseClass || 'neuron') !== 'neuron');
             const icon = locationIcons[groupName.toLowerCase()] || '📍';
-            html += '<div class="tree-soma-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">' + icon + '</span><span class="tree-soma-name">' + groupName + '</span><span class="tree-soma-count">' + fams.length + ' families • ' + cells.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
-            html += renderFamilies(fams, gi);
+            const neuronFams = buildFamilies(locNeurons);
+            html += '<div class="tree-soma-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">' + icon + '</span><span class="tree-soma-name">' + groupName + '</span><span class="tree-soma-count">' + allCells.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
+            if (locNeurons.length > 0) {
+                html += '<div class="tree-subgroup"><div class="tree-subgroup-header" onclick="toggleSubgroup(\'sub-' + gi + '-n\')"><span class="tree-soma-toggle" id="sub-toggle-' + gi + '-n">▶</span><span class="tree-soma-icon">🧠</span><span class="tree-soma-name">Neurons</span><span class="tree-soma-count">' + neuronFams.length + ' families • ' + locNeurons.length + ' cells</span></div><div class="tree-subgroup-children" id="sub-children-' + gi + '-n">';
+                html += renderFamilies(neuronFams, gi + 'n');
+                html += '</div></div>';
+            }
+            if (locNonNeurons.length > 0) {
+                html += '<div class="tree-subgroup non-neuronal-group"><div class="tree-subgroup-header" onclick="toggleSubgroup(\'sub-' + gi + '-nn\')"><span class="tree-soma-toggle" id="sub-toggle-' + gi + '-nn">▶</span><span class="tree-soma-icon">🔬</span><span class="tree-soma-name">Non-neuronal Cells</span><span class="tree-soma-count">' + locNonNeurons.length + ' cells</span></div><div class="tree-subgroup-children" id="sub-children-' + gi + '-nn">';
+                html += renderNonNeuronSubgroups(locNonNeurons, gi + 'nn');
+                html += '</div></div>';
+            }
             html += '</div></div>';
             gi++;
         });
     } else {
-        // Hierarchical axon grouping: A fiber (with Aβ, Aδ children), C fiber, Unknown
+        // Hierarchical axon grouping: A fiber (with Aβ, Aδ, A unspecified), C fiber, Unknown
         const aFiberCells = { beta: [], delta: [], other: [] };
         const cFiberCells = [];
         const unknownCells = [];
-        
+
         neuronTypes.forEach(ct => {
             const fts = (ct.fiberTypeString || '').toLowerCase();
             const attrs = ct.clusterAttributes || {};
-            
+
             if (attrs.fiber_a_beta) {
                 if (!aFiberCells.beta.find(x => x.preferredLabel === ct.preferredLabel)) aFiberCells.beta.push(ct);
             } else if (attrs.fiber_a_delta) {
                 if (!aFiberCells.delta.find(x => x.preferredLabel === ct.preferredLabel)) aFiberCells.delta.push(ct);
-            } else if (fts.includes('type a') && !fts.includes('beta') && !fts.includes('delta')) {
+            } else if (fts.includes('type a') && !fts.includes('β') && !fts.includes('δ') && !fts.includes('beta') && !fts.includes('delta')) {
                 if (!aFiberCells.other.find(x => x.preferredLabel === ct.preferredLabel)) aFiberCells.other.push(ct);
             } else if (attrs.fiber_c || fts.includes('type c')) {
                 if (!cFiberCells.find(x => x.preferredLabel === ct.preferredLabel)) cFiberCells.push(ct);
@@ -676,13 +709,13 @@ function renderTreeView() {
                 if (!unknownCells.find(x => x.preferredLabel === ct.preferredLabel)) unknownCells.push(ct);
             }
         });
-        
+
         const totalACells = aFiberCells.beta.length + aFiberCells.delta.length + aFiberCells.other.length;
-        
+
         // A fiber group (parent)
         if (totalACells > 0) {
             html += '<div class="tree-soma-group"><div class="tree-soma-header axon" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">🔷</span><span class="tree-soma-name">A fiber</span><span class="tree-soma-count">' + totalACells + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
-            
+
             // Aβ fiber subgroup
             if (aFiberCells.beta.length > 0) {
                 const betaFams = buildFamilies(aFiberCells.beta);
@@ -690,7 +723,7 @@ function renderTreeView() {
                 html += renderFamilies(betaFams, gi + 'b');
                 html += '</div></div>';
             }
-            
+
             // Aδ fiber subgroup
             if (aFiberCells.delta.length > 0) {
                 const deltaFams = buildFamilies(aFiberCells.delta);
@@ -698,7 +731,7 @@ function renderTreeView() {
                 html += renderFamilies(deltaFams, gi + 'd');
                 html += '</div></div>';
             }
-            
+
             // Other A fibers (not beta or delta)
             if (aFiberCells.other.length > 0) {
                 const otherFams = buildFamilies(aFiberCells.other);
@@ -706,11 +739,11 @@ function renderTreeView() {
                 html += renderFamilies(otherFams, gi + 'o');
                 html += '</div></div>';
             }
-            
+
             html += '</div></div>';
             gi++;
         }
-        
+
         // C fiber group
         if (cFiberCells.length > 0) {
             const cFams = buildFamilies(cFiberCells);
@@ -719,7 +752,7 @@ function renderTreeView() {
             html += '</div></div>';
             gi++;
         }
-        
+
         // Unknown group
         if (unknownCells.length > 0) {
             const uFams = buildFamilies(unknownCells);
@@ -728,28 +761,14 @@ function renderTreeView() {
             html += '</div></div>';
             gi++;
         }
-    }
 
-    // Non-neuronal cells section — group by ilxtr:subClassOf data
-    if (nonNeuronTypes.length > 0) {
-        const subgroups = {};
-        nonNeuronTypes.forEach(ct => {
-            const subs = ct.subClassOf || [];
-            const groupLabel = subs.length > 0 ? subs[subs.length - 1] : 'Other';
-            if (!subgroups[groupLabel]) subgroups[groupLabel] = [];
-            subgroups[groupLabel].push(ct);
-        });
-        html += '<div class="tree-soma-group non-neuronal-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">🔬</span><span class="tree-soma-name">Non-neuronal Cells</span><span class="tree-soma-count">' + nonNeuronTypes.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
-        Object.entries(subgroups).forEach(([subName, cells], si) => {
-            const uid = gi + '-nn-' + si;
-            html += '<div class="tree-item"><div class="tree-master" onclick="toggleFamily(\'' + uid + '\')"><span class="tree-toggle" id="toggle-' + uid + '">▶</span><div style="display:inline-block;vertical-align:top;"><div class="tree-master-name">' + subName + '</div><div class="tree-master-count">' + cells.length + ' cells</div></div></div><div class="tree-children" id="children-' + uid + '">';
-            cells.forEach(ct => {
-                html += '<div class="tree-child" onclick="openCellById(\'' + ct.id + '\')"><div class="tree-child-name">' + ct.preferredLabel + '</div></div>';
-            });
+        // Non-neuronal cells in axon view
+        if (nonNeuronTypes.length > 0) {
+            html += '<div class="tree-soma-group non-neuronal-group"><div class="tree-soma-header" onclick="toggleSomaGroup(' + gi + ')"><span class="tree-soma-toggle" id="soma-toggle-' + gi + '">▶</span><span class="tree-soma-icon">🔬</span><span class="tree-soma-name">Non-neuronal Cells</span><span class="tree-soma-count">' + nonNeuronTypes.length + ' cells</span></div><div class="tree-soma-children" id="soma-children-' + gi + '">';
+            html += renderNonNeuronSubgroups(nonNeuronTypes, gi);
             html += '</div></div>';
-        });
-        html += '</div></div>';
-        gi++;
+            gi++;
+        }
     }
 
     c.innerHTML = html;
@@ -853,26 +872,28 @@ function renderSynthesisView() {
     
     // Group cells
     let groups = {};
+    function getAxonGroup(ct) {
+        const attrs = ct.clusterAttributes || {};
+        if (attrs.fiber_a_beta) return 'Aβ fiber';
+        if (attrs.fiber_a_delta) return 'Aδ fiber';
+        if (attrs.fiber_c) return 'C fiber';
+        const fts = (ct.fiberTypeString || '').toLowerCase();
+        if (fts.includes('type a')) return 'A fiber';
+        return 'Other';
+    }
+
     if (groupBy === 'species-axon') {
         sortedCells.forEach(ct => {
             const species = ct.species || 'Unknown';
-            let axon = 'Other';
-            if (ct.clusterAttributes.fiber_a_beta) axon = 'Aβ fiber';
-            else if (ct.clusterAttributes.fiber_a_delta) axon = 'Aδ fiber';
-            else if (ct.clusterAttributes.fiber_c) axon = 'C fiber';
-            
             const groupKey = species;
-            const subKey = axon;
+            const subKey = getAxonGroup(ct);
             if (!groups[groupKey]) groups[groupKey] = {};
             if (!groups[groupKey][subKey]) groups[groupKey][subKey] = [];
             groups[groupKey][subKey].push(ct);
         });
     } else if (groupBy === 'axon-species') {
         sortedCells.forEach(ct => {
-            let axon = 'Other';
-            if (ct.clusterAttributes.fiber_a_beta) axon = 'Aβ fiber';
-            else if (ct.clusterAttributes.fiber_a_delta) axon = 'Aδ fiber';
-            else if (ct.clusterAttributes.fiber_c) axon = 'C fiber';
+            const axon = getAxonGroup(ct);
             
             const groupKey = axon;
             const subKey = ct.species || 'Unknown';
@@ -899,13 +920,14 @@ function renderSynthesisView() {
     html += '</tr></thead>';
 
     // Build grouped rows
+    const axonOrder = ['Aβ fiber', 'Aδ fiber', 'A fiber', 'C fiber', 'Other'];
     const groupOrder = groupBy === 'species-axon' ? ['human', 'mouse', 'macaque', 'guinea pig'] :
-                      groupBy === 'axon-species' ? ['Aβ fiber', 'Aδ fiber', 'C fiber', 'Other'] :
+                      groupBy === 'axon-species' ? axonOrder :
                       Object.keys(groups).sort();
 
     // In pinned mode, status is shown above the table, no in-table header needed
 
-    const subGroupOrder = groupBy === 'species-axon' ? ['Aβ fiber', 'Aδ fiber', 'C fiber', 'Other'] :
+    const subGroupOrder = groupBy === 'species-axon' ? axonOrder :
                          groupBy === 'axon-species' ? ['human', 'mouse', 'macaque', 'guinea pig'] :
                          null;
 
@@ -1677,7 +1699,9 @@ function togglePinnedRow(idx) {
 function highlightEquivPair(idx) { highlightRelationships(idx); }
 function clearEquivHighlight() { clearRelationshipHighlights(); }
 
-function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); const neuronCells=CELL_TYPES.map((ct,i)=>({ct,i})).filter(x=>(x.ct.baseClass||'neuron')==='neuron'); clusterNodes=neuronCells.map(x=>({...x.ct,idx:x.i,id:x.i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); }
+function getClusterBaseClassFilter() { const el = document.getElementById('clusterBaseClassFilter'); return el ? el.value : 'neuron'; }
+function onClusterBaseClassChange() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); initClusterView(); updateClusterStats(); updateClusterLegend(); }
+function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); const baseClassFilter=getClusterBaseClassFilter(); const filteredCells=CELL_TYPES.map((ct,i)=>({ct,i})).filter(x=>(x.ct.baseClass||'neuron')===baseClassFilter); clusterNodes=filteredCells.map(x=>({...x.ct,idx:x.i,id:x.i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); updateClusterStats(); updateClusterLegend(); }
 
 function clearAllFilters() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); updateClusterLegend(); updateClusterStats(); updateClusterVisualization(); }
 function updateSelectedDisplay() { const display=document.getElementById('selectedAttrsDisplay'); if(selectedAttributes.length===0){display.textContent='No attributes selected';}else{const labels=selectedAttributes.map(a=>{if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);return gene?gene.display:a;}return ATTR_LABELS[a]||a;});display.textContent=`Selected (${labels.length}): ${labels.join(', ')}`;} }
@@ -1835,21 +1859,23 @@ function hideClusterTooltip() { document.getElementById('clusterTooltip').classL
 function updateClusterLegend() { const lg=document.getElementById('clusterLegendInline'); if(selectedAttributes.length===0){const srcCounts={};CELL_TYPES.forEach(ct=>{const lbl=ct.sourceNomenclatureLabel||'Unknown';if(!srcCounts[lbl])srcCounts[lbl]={count:0,color:ct.sourceColor||'#667eea'};srcCounts[lbl].count++;});let h='';Object.entries(srcCounts).forEach(([lbl,info])=>{h+='<div class="legend-item-inline"><div class="legend-dot" style="background:'+info.color+';"></div><span>'+lbl+' ('+info.count+')</span></div>';});lg.innerHTML=h;return;} let html=''; selectedAttributes.forEach((a,i)=>{let label;if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);label=gene?gene.display:a;}else{label=ATTR_SHORT[a]||a;}html+=`<div class="legend-item-inline"><div class="legend-dot" style="background:${ATTR_COLORS[i%ATTR_COLORS.length]};"></div><span>${label}</span></div>`;}); if(selectedAttributes.length>=2){html+='<div class="legend-item-inline"><div class="legend-dot" style="background:#FFD700;border:2px solid #FFA500;box-shadow:0 0 4px #FFD700;"></div><span>All (intersection)</span></div>';} html+='<div class="legend-item-inline"><div class="legend-dot" style="background:#555;"></div><span>None</span></div>'; lg.innerHTML=html; }
 function updateClusterStats() { 
     const st=document.getElementById('clusterStatsInline'); 
-    let html=`<div class="stat-item"><span class="stat-label">Total:</span><span class="stat-value">${CELL_TYPES.length}</span></div>`; 
+    let html=`<div class="stat-item"><span class="stat-label">Total:</span><span class="stat-value">${clusterNodes?clusterNodes.length:CELL_TYPES.length}</span></div>`; 
     if(selectedAttributes.length>0){
         selectedAttributes.slice(0,4).forEach((a,i)=>{
-            const matchingCells = CELL_TYPES.filter(ct=>cellMatchesAttr(ct,a));
+            const pool=clusterNodes||CELL_TYPES;
+            const matchingCells = pool.filter(ct=>cellMatchesAttr(ct,a));
             const c=matchingCells.length;
-            
+
             if(a.startsWith('gene_')) {
-                
+
             }
             let label;
             if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);label=gene?gene.display:a;}else{label=ATTR_SHORT[a]||a;}
             html+=`<div class="stat-item"><span class="stat-label">${label}:</span><span class="stat-value" style="color:${ATTR_COLORS[i%ATTR_COLORS.length]};">${c}</span></div>`;
         });
         if(selectedAttributes.length>=2){
-            const ic=CELL_TYPES.filter(ct=>selectedAttributes.every(a=>cellMatchesAttr(ct,a))).length;
+            const pool=clusterNodes||CELL_TYPES;
+            const ic=pool.filter(ct=>selectedAttributes.every(a=>cellMatchesAttr(ct,a))).length;
             
             html+=`<div class="stat-item"><span class="stat-label">All:</span><span class="stat-value" style="color:#FFD700;text-shadow:0 0 4px #FFA500;">${ic}</span></div>`;
         }
@@ -3613,7 +3639,17 @@ function renderSourcesFooter() {
     footer.innerHTML = html;
 }
 
+function updateVersionInfo() {
+    const el = document.getElementById('versionInfo');
+    if (!el) return;
+    const dv = typeof DATA_VERSION !== 'undefined' ? DATA_VERSION : null;
+    const parts = ['App v' + APP_VERSION];
+    if (dv) parts.push('Data v' + dv.version + ' (' + dv.date + ')');
+    el.textContent = parts.join(' · ');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    updateVersionInfo();
     updateDataStatus();
     renderSourcesFooter();
     renderCards();

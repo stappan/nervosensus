@@ -9,6 +9,7 @@ and writes js/data.js with the four constants:
 Usage:
     python sync_data.py                     # auto-finds .xlsx in project dir
     python sync_data.py path/to/file.xlsx   # specify a file
+    python sync_data.py file.xlsx --max-row 3612   # ingest only up to sheet row 3612
 """
 
 import json
@@ -79,8 +80,11 @@ CANONICAL_HEADERS = {
 }
 
 
-def read_excel(path):
-    """Read the data sheet and return rows as list of dicts."""
+def read_excel(path, max_row=None):
+    """Read the data sheet and return rows as list of dicts.
+
+    max_row is a 1-based sheet row number (header = row 1); rows after it are ignored.
+    """
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
 
     # Find the sheet (case-insensitive match, try multiple known names)
@@ -98,7 +102,7 @@ def read_excel(path):
     ws = wb[sheet_name]
     rows = []
     headers = None
-    for i, row in enumerate(ws.iter_rows(values_only=True)):
+    for i, row in enumerate(ws.iter_rows(values_only=True, max_row=max_row)):
         if i == 0:
             raw = [str(h).strip() if h else '' for h in row]
             headers = [CANONICAL_HEADERS.get(h.lower(), h) for h in raw]
@@ -227,7 +231,8 @@ def parse_npo_data(rows):
             if p['npo'] == 'ilxtr:literatureCitation' and p['iri']:
                 if p['iri'] not in sources:
                     sources[p['iri']] = {'label': p['value'] or p['iri'], 'cells': []}
-                sources[p['iri']]['cells'].append(nid)
+                if nid not in sources[p['iri']]['cells']:
+                    sources[p['iri']]['cells'].append(nid)
 
     source_color_map = {}
     for i, (url, data) in enumerate(sources.items()):
@@ -458,7 +463,8 @@ def parse_npo_data(rows):
                     ct['subClassOf'].append(val)
 
         # Build derived strings
-        ct['geneExpressionString'] = ' + '.join(g['display'] for g in gene_items)
+        # dict.fromkeys drops repeats (same gene listed in more than one row block)
+        ct['geneExpressionString'] = ' + '.join(dict.fromkeys(g['display'] for g in gene_items))
         ct['fiberTypeString'] = ' + '.join(a['display'] for a in axon_items)
         ct['fiberTypeStringAbbrev'] = ct['fiberTypeString']
 
@@ -575,7 +581,7 @@ def parse_npo_data(rows):
 
 DATA_VERSION = '0.1.0-beta'
 
-def write_data_js(out_path, families, cell_types, genes, source_color_map, source_file):
+def write_data_js(out_path, families, cell_types, genes, source_color_map, source_file, max_row=None):
     """Write the data constants and version info to js/data.js."""
 
     neuron_count = sum(1 for ct in cell_types if (ct.get('baseClass') or 'neuron') == 'neuron')
@@ -590,6 +596,8 @@ def write_data_js(out_path, families, cell_types, genes, source_color_map, sourc
         'sourceCount': len(source_color_map),
         'sourceFile': os.path.basename(source_file),
     }
+    if max_row:
+        version_info['sourceMaxRow'] = max_row
 
     families_json = json.dumps(families, ensure_ascii=False, separators=(',', ':'))
     cells_json = json.dumps(cell_types, ensure_ascii=False, separators=(',', ':'))
@@ -615,9 +623,20 @@ def write_data_js(out_path, families, cell_types, genes, source_color_map, sourc
 def main():
     project_dir = os.path.dirname(os.path.abspath(__file__))
 
+    args = sys.argv[1:]
+    max_row = None
+    if '--max-row' in args:
+        i = args.index('--max-row')
+        try:
+            max_row = int(args[i + 1])
+        except (IndexError, ValueError):
+            print("ERROR: --max-row needs a row number, e.g.  --max-row 3612")
+            sys.exit(1)
+        del args[i:i + 2]
+
     # Determine Excel file path
-    if len(sys.argv) > 1:
-        xlsx_path = sys.argv[1]
+    if args:
+        xlsx_path = args[0]
     else:
         xlsx_path = find_xlsx(project_dir)
 
@@ -625,10 +644,11 @@ def main():
         print("ERROR: No .xlsx file found. Provide a path:  python sync_data.py path/to/file.xlsx")
         sys.exit(1)
 
-    print(f"Reading: {os.path.basename(xlsx_path)}")
+    print(f"Reading: {os.path.basename(xlsx_path)}"
+          + (f" (rows 2-{max_row})" if max_row else ""))
 
     # Read and parse
-    rows = read_excel(xlsx_path)
+    rows = read_excel(xlsx_path, max_row)
     print(f"  Rows read: {len(rows)}")
 
     families, cell_types, genes, source_color_map = parse_npo_data(rows)
@@ -659,7 +679,7 @@ def main():
 
     # Write output
     out_path = os.path.join(project_dir, 'js', 'data.js')
-    write_data_js(out_path, families, cell_types, genes, source_color_map, xlsx_path)
+    write_data_js(out_path, families, cell_types, genes, source_color_map, xlsx_path, max_row)
 
     print(f"\nDone! {len(families)} families, {len(cell_types)} cells, "
           f"{len(genes)} genes, {len(source_color_map)} sources.")

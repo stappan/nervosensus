@@ -40,6 +40,32 @@ SOURCE_COLORS = [
 ]
 
 
+# Spinal regions of the dorsal root ganglion and their segment-level ganglia,
+# from UBERON (UBERON_0000044 'dorsal root ganglion' -> regional DRG -> segment
+# DRG; verified against OLS). Segments are listed in anatomical order. Used to
+# group ilxtr:hasSomaLocatedIn segment rows by region on the cell detail page.
+UBERON = 'http://purl.obolibrary.org/obo/UBERON_'
+SPINAL_REGIONS_BY_SOMA = {
+    UBERON + '0000044': [  # dorsal root ganglion
+        ('cervical', [('C1', '0002838'), ('C2', '0002839'), ('C3', '0002840'), ('C4', '0002841'),
+                      ('C5', '0002842'), ('C6', '0007711'), ('C7', '0002843'), ('C8', '0002844')]),
+        ('thoracic', [('T1', '0002845'), ('T2', '0002846'), ('T3', '0002847'), ('T4', '0007712'),
+                      ('T5', '0002848'), ('T6', '0002849'), ('T7', '0002850'), ('T8', '0002851'),
+                      ('T9', '0002852'), ('T10', '0002853'), ('T11', '0002854'), ('T12', '0002855')]),
+        ('lumbar',   [('L1', '0002857'), ('L2', '0002856'), ('L3', '0002858'), ('L4', '0003943'),
+                      ('L5', '0002859'), ('L6', '1200001')]),
+        ('sacral',   [('S1', '0002860'), ('S2', '0002861'), ('S3', '0002862'), ('S4', '0007713'),
+                      ('S5', '0002863')]),
+    ],
+}
+# segment IRI -> (soma IRI, region, short name, anatomical order)
+SPINAL_SEGMENTS = {}
+for _soma_iri, _regions in SPINAL_REGIONS_BY_SOMA.items():
+    for _region, _segs in _regions:
+        for _order, (_short, _num) in enumerate(_segs):
+            SPINAL_SEGMENTS[UBERON + _num] = (_soma_iri, _region, _short, _order)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -52,6 +78,27 @@ def safe_str(val):
     if s.lower() == 'none':
         return ''
     return s
+
+
+def summarize_ages(raw):
+    """Split an ilxtr:observedAtAgeInYears list into the parts shown on the detail page.
+
+    Uses only the values given: min/max of the numeric entries (written as in the
+    sheet), the non-numeric entries verbatim in sheet order, and the entry count.
+    """
+    values = [t.strip() for t in raw.split(',') if t.strip()]
+    numeric = []
+    other = []
+    for v in values:
+        try:
+            numeric.append((float(v), v))
+        except ValueError:
+            other.append(v)
+    summary = {'values': values, 'count': len(values), 'other': other}
+    if numeric:
+        summary['min'] = min(numeric)[1]
+        summary['max'] = max(numeric)[1]
+    return summary
 
 
 def find_xlsx(project_dir):
@@ -129,6 +176,7 @@ def parse_npo_data(rows):
     neurons = {}  # neuron_id -> list of property dicts
     neuron_npokb = {}  # neuron_id -> npokb:Id CURIE
     neuron_base_class = {}  # neuron_id -> "neuron" or "cell"
+    npokb_first_nid = {}  # npokb:Id -> first Neuron ID seen for it
     skipped_dont_add = 0
     errors = []
 
@@ -161,6 +209,11 @@ def parse_npo_data(rows):
 
         val = safe_str(value_label)
         iri = safe_str(value_iri)
+
+        # Group rows by npokb ID: later row blocks for a cell may use a different
+        # Neuron ID text, so they merge into the first block seen for that ID.
+        if npokb_id:
+            neuron_id = npokb_first_nid.setdefault(npokb_id, neuron_id)
 
         if npokb_id and neuron_id:
             neuron_npokb[neuron_id] = npokb_id
@@ -247,6 +300,7 @@ def parse_npo_data(rows):
     # ------------------------------------------------------------------
     cell_types = []
     gene_map = {}  # base_name -> { display, cells[] }
+    warnings = []
 
     for nid, props in neurons.items():
         if 'master' in nid.lower():
@@ -301,6 +355,7 @@ def parse_npo_data(rows):
             'sourceData': [],
             'localLabel': '',
             'subClassOf': [],
+            'biologicalSex': [],
             'clusterAttributes': {
                 'cold_sensitive': False,
                 'heat_sensitive': False,
@@ -326,6 +381,10 @@ def parse_npo_data(rows):
         adaptation_items = []
         functional_items = []
         axon_items = []
+        soma_iris = []
+        soma_label_by_iri = {}
+        segment_rows = []
+        species_seen = []
 
         for p in props:
             npo = p['npo']
@@ -342,6 +401,8 @@ def parse_npo_data(rows):
                 ct['localLabel'] = val
 
             elif npo == 'ilxtr:hasInstanceInTaxon':
+                if val.lower() not in species_seen:
+                    species_seen.append(val.lower())
                 ct['species'] = val.lower()
                 sp_key = 'species_' + val.lower().replace(' ', '_')
                 if sp_key in ct['clusterAttributes']:
@@ -353,7 +414,15 @@ def parse_npo_data(rows):
             elif npo == 'ilxtr:hasNeurotransmitterPhenotype':
                 ct['neurotransmitter'] = val.strip()
 
+            elif npo == 'ilxtr:hasSomaLocatedIn' and iri in SPINAL_SEGMENTS:
+                # Segment-level ganglion: kept out of somaLocations so tree/cluster
+                # grouping is unchanged; shown under its region on the detail page.
+                segment_rows.append(iri)
+
             elif npo == 'ilxtr:hasSomaLocatedIn' and val:
+                if iri and iri not in soma_iris:
+                    soma_iris.append(iri)
+                    soma_label_by_iri[iri] = val
                 if val not in ct['somaLocations']:
                     ct['somaLocations'].append(val)
                 if 'dorsal root' in val.lower():
@@ -445,11 +514,21 @@ def parse_npo_data(rows):
                 if 'proprioceptive' in vl:
                     ct['clusterAttributes']['proprioceptive'] = True
 
-            elif npo == 'alertNote' and val:
+            elif npo in ('ilxtr:alertNote', 'alertNote') and val:
                 ct['alertNotes'].append(val)
 
-            elif npo == 'curatorNote' and val:
+            elif npo in ('ilxtr:curatorNote', 'curatorNote') and val:
                 ct['curatorNotes'].append(val)
+
+            elif npo == 'ilxtr:hasBiologicalSex' and val:
+                if val not in ct['biologicalSex']:
+                    ct['biologicalSex'].append(val)
+
+            elif npo == 'ilxtr:observedAtAgeInYears' and val:
+                if 'observedAge' in ct:
+                    warnings.append(f"{ct['id']}: more than one ilxtr:observedAtAgeInYears row; using the first")
+                else:
+                    ct['observedAge'] = summarize_ages(val)
 
             elif npo == 'ilxtr:dataCitation' and (val or iri):
                 ct['sourceData'].append({'label': val or iri, 'uri': iri or ''})
@@ -487,6 +566,29 @@ def parse_npo_data(rows):
 
         if ct['somaLocations']:
             ct['somaLocation'] = ct['somaLocations'][0]
+
+        # Spinal regions: every region of the soma location is listed (empty ones
+        # included) so a missing region reads as "no data", not as forgotten.
+        for soma_iri in soma_iris:
+            if soma_iri in SPINAL_REGIONS_BY_SOMA:
+                found = {}
+                for seg_iri in dict.fromkeys(segment_rows):
+                    seg_soma, region, short, order = SPINAL_SEGMENTS[seg_iri]
+                    if seg_soma == soma_iri:
+                        found.setdefault(region, []).append((order, short))
+                ct['spinalRegions'] = [
+                    {'region': region, 'segments': [short for _, short in sorted(found.get(region, []))]}
+                    for region, _ in SPINAL_REGIONS_BY_SOMA[soma_iri]
+                ]
+                ct['spinalRegionsOf'] = soma_label_by_iri[soma_iri]
+                break
+        if segment_rows and 'spinalRegions' not in ct:
+            warnings.append(f"{ct['id']}: has spinal segment rows but no matching soma location")
+
+        if len(species_seen) > 1 and (ct['biologicalSex'] or 'observedAge' in ct):
+            warnings.append(f"{ct['id']}: biological sex / age given for a cell with "
+                            f"{len(species_seen)} species ({', '.join(species_seen)}); "
+                            "these can't be attributed to one species")
 
         # Deduplicate markerGenes by base name (protein + RNA rows for same gene)
         seen_genes = {}
@@ -571,6 +673,11 @@ def parse_npo_data(rows):
             'name': pref_label,
             'children': children,
         })
+
+    if warnings:
+        print(f"\n  WARNING: {len(warnings)} subject/location issue(s):")
+        for w in warnings:
+            print(f"    - {w}")
 
     return families, cell_types, genes, source_color_map
 

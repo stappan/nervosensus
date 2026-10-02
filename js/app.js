@@ -75,7 +75,7 @@ function formatGeneExpression(t) { return t ? t.replace(/(\w+)\^(\w+)/g, '$1<sup
 function formatFiberType(s) { return s ? s.replace(/type Ad/g,'type Aδ').replace(/type Ab/g,'type Aβ').replace(/Ad \(/g,'Aδ (').replace(/Ab \(/g,'Aβ (').replace(/\(delta\)/g,'(δ)').replace(/\(beta\)/g,'(β)') : ''; }
 function getSourceLinkText(ct) { return ct.sourceNomenclatureLabel || 'View Source Publication'; }
 function extractDOI(url) { if (!url) return ''; const m = url.match(/doi\.org\/(.+)$/); return m ? m[1] : url; }
-function buildSourceLine(ct) { const doi = extractDOI(ct.sourceNomenclature); return `<div class="card-source-line"><span class="card-source-name" style="color:${ct.sourceColor||'#667eea'}">${ct.sourceNomenclatureLabel||''}</span>${doi ? `<span class="card-source-sep">·</span><a class="card-source-doi" href="${ct.sourceNomenclature}" target="_blank" rel="noopener" onclick="event.stopPropagation();">${doi}</a>` : ''}</div>`; }
+function buildSourceLine(ct, withLink) { const doi = extractDOI(ct.sourceNomenclature); return `<div class="card-source-line"><span class="source-dot" style="background:${ct.sourceColor||'#667eea'}"></span><span class="card-source-name">${ct.sourceNomenclatureLabel||''}</span>${withLink && doi ? `<span class="card-source-sep">·</span><a class="card-source-doi" href="${ct.sourceNomenclature}" target="_blank" rel="noopener" onclick="event.stopPropagation();">${doi} ↗</a>` : ''}</div>`; }
 function getSourceDOIMap() {
     const map = {};
     CELL_TYPES.forEach(ct => {
@@ -546,7 +546,7 @@ function applyCardFilters() {
         const equivBadge = hasAnyRel ? '<span class="card-badge equiv" title="Has proposed relationships">≡</span>' : '';
         const subtypeBadge = '';
         
-        return `<div class="card-compact" style="border-left-color:${ct.sourceColor||'#667eea'}" data-idx="${idx}">
+        return `<div class="card-compact" data-idx="${idx}">
             <div class="card-compact-header" onclick="toggleCardExpand(${idx})">
                 <div class="card-compact-info">
                     <div class="card-npokb-id">${ct.id||''}</div>
@@ -2674,75 +2674,124 @@ function renderLineageView() {
 
 
 
-function buildCellDetailHTML(idx, useLinks) {
-    const ct=CELL_TYPES[idx];
-    let relatedHtml='';
-    if(ct.relatedCells&&ct.relatedCells.length>0){
-        const relButtons = ct.relatedCells.map(rc => {
-            if (useLinks) {
-                const ri = rc.id ? (ID_INDEX[rc.id] ?? -1) : -1;
-                return ri !== -1 ? `<a href="#cell/${CELL_TYPES[ri].id}" class="related-cell-btn" onclick="event.stopPropagation();">${rc.label}</a>` : `<span class="related-cell-btn">${rc.label}</span>`;
-            }
-            return `<button class="related-cell-btn" onclick="openCellById('${rc.id}')">${rc.label}</button>`;
-        }).join('');
-        relatedHtml=`<div class="detail-section"><h3>🔗 Related Species Variants</h3><div class="related-cells">${relButtons}</div></div>`;
-    }
-    let assertedHtml='';
-    const relationships = getAssertedRelationships(idx);
-    const hasAnyRelationship = relationships.equivalences.length > 0 || relationships.subtypeOf.length > 0 || relationships.hasSubtypes.length > 0;
+// Cell detail (modal and full page). Compact label/value layout: subject and
+// location top left, proposed relationships top right, then phenotype and notes
+// at full width.
+function cdRow(label, valueHtml, sub) {
+    return `<dt class="${sub ? 'cd-sub' : ''}">${label}</dt><dd>${valueHtml}</dd>`;
+}
 
-    if(hasAnyRelationship){
-        let innerHtml = '';
-        if(relationships.equivalences.length > 0) {
-            const equivLinks = relationships.equivalences.map(r => {
-                const arrow = r.direction === 'to' ? '→' : '←';
-                const title = r.direction === 'to' ? 'Consistent with' : 'Consistent with';
-                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn equiv-btn" title="${title}">${arrow} ${r.label}</a>`;
-                return `<button class="related-cell-btn equiv-btn" onclick="showModal(${r.idx})" title="${title}">${arrow} ${r.label}</button>`;
-            }).join(' ');
-            innerHtml += `<div class="asserted-equiv-section"><div class="asserted-label">Consistent with:</div><div class="related-cells">${equivLinks}</div></div>`;
-        }
-        if(relationships.subtypeOf.length > 0) {
-            const subtypeLinks = relationships.subtypeOf.map(r => {
-                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn">↑ ${r.label}</a>`;
-                return `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↑ ${r.label}</button>`;
-            }).join(' ');
-            innerHtml += `<div class="asserted-subtype-section"><div class="asserted-label">Subtype of:</div><div class="related-cells">${subtypeLinks}</div></div>`;
-        }
-        if(relationships.hasSubtypes.length > 0) {
-            const hasSubLinks = relationships.hasSubtypes.map(r => {
-                if (useLinks) return `<a href="#cell/${r.id}" class="related-cell-btn subtype-btn">↓ ${r.label}</a>`;
-                return `<button class="related-cell-btn subtype-btn" onclick="showModal(${r.idx})">↓ ${r.label}</button>`;
-            }).join(' ');
-            innerHtml += `<div class="asserted-subtype-section"><div class="asserted-label">Has proposed subtypes:</div><div class="related-cells">${hasSubLinks}</div></div>`;
-        }
-        assertedHtml=`<div class="asserted-relationships"><div class="asserted-relationships-title">🔗 Proposed Relationships</div>${innerHtml}</div>`;
-    }
-    let mapsToHtml = assertedHtml;
-    const sourceLinkHtml='';
-    const sourceDataHtml = ct.sourceData && ct.sourceData.length > 0 ? `<div class="detail-section"><h3>📊 Source Data</h3>${ct.sourceData.map(sd => `<a href="${sd.uri}" target="_blank" class="source-link">${sd.label} ↗</a>`).join('<br>')}</div>` : '';
-    let precisionHtml = '';
-    if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025' && ct.markerGenes && ct.markerGenes.length > 0) {
-        const seenGenes = new Set();
-        const precisionMarkers = [];
-        for (const g of ct.markerGenes) {
-            if (!g.name) continue;
-            const canonical = g.name.toUpperCase();
-            if (PRECISION_GENES.has(canonical) && !seenGenes.has(canonical)) {
-                seenGenes.add(canonical);
-                precisionMarkers.push(canonical);
+function cdBadges(methods) {
+    return methods ? methods.map(m => `<span class="method-badge">${m}</span>`).join('') : '';
+}
+
+// Age summary from the sheet's list only: numeric min-max, non-numeric entries
+// verbatim, entry count; "show all" reveals the list as written.
+function buildAgeHTML(age, idx) {
+    let range = '';
+    if (age.min !== undefined) range = age.min === age.max ? `${age.min} years` : `${age.min}–${age.max} years`;
+    const summary = [range, ...age.other].filter(Boolean).join(', ');
+    const listId = `cd-ages-${idx}`;
+    return `${summary} <span class="cd-muted">| ${age.count} value${age.count === 1 ? '' : 's'}</span>` +
+        ` <button type="button" class="cd-toggle" onclick="toggleAgeList('${listId}', this)">show all</button>` +
+        `<div class="cd-age-list" id="${listId}" hidden>${age.values.join(', ')}</div>`;
+}
+
+function toggleAgeList(id, btn) {
+    const list = document.getElementById(id);
+    list.hidden = !list.hidden;
+    btn.textContent = list.hidden ? 'show all' : 'hide';
+}
+
+function buildSomaRowsHTML(ct) {
+    const locations = ct.somaLocations && ct.somaLocations.length ? ct.somaLocations : [ct.somaLocation].filter(Boolean);
+    let html = '';
+    locations.forEach((loc, i) => {
+        html += cdRow(i === 0 ? 'Soma location' : '', loc);
+        if (ct.spinalRegions && loc === ct.spinalRegionsOf) {
+            if (ct.spinalRegions.every(r => r.segments.length === 0)) {
+                html += cdRow('Spinal segments', '<span class="cd-muted">no data for any region</span>', true);
+            } else {
+                ct.spinalRegions.forEach(r => {
+                    html += cdRow(`<span class="cd-cap">${r.region}</span>`,
+                        r.segments.length ? r.segments.join(', ') : '<span class="cd-muted">no data</span>', true);
+                });
             }
         }
-        if (precisionMarkers.length > 0) {
-            const buttons = precisionMarkers.map(gene => {
-                const url = `${PRECISION_BASE_URL}?dashboard=genedistribution&gene=${encodeURIComponent(gene)}&metadataColumn=${encodeURIComponent('Atlas_annotation')}`;
-                return `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 0.75rem;background:#f8f4ff;border:1px solid #c4b5fd;border-radius:6px;text-decoration:none;color:#5b21b6;font-size:0.85em;font-weight:500;transition:background 0.15s;" onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background='#f8f4ff'"><span style="font-family:monospace;">${gene}</span><span style="color:#7c3aed;font-size:0.9em;">↗</span></a>`;
-            });
-            precisionHtml = `<div class="detail-section"><h3>🧬 PRECISION Atlas — Gene Expression Distribution</h3><p style="font-size:0.82em;color:#64748b;margin:0 0 0.6rem;">View gene expression by cell type.</p><div style="display:flex;flex-wrap:wrap;gap:0.4rem;">${buttons.join('')}</div></div>`;
-        }
+    });
+    return html;
+}
+
+function buildRelationshipRowsHTML(idx, useLinks) {
+    const ct = CELL_TYPES[idx];
+    const rels = getAssertedRelationships(idx);
+    const link = (id, i, cls, text, title) => useLinks
+        ? `<a href="#cell/${id}" class="related-cell-btn ${cls}"${title ? ` title="${title}"` : ''}>${text}</a>`
+        : `<button class="related-cell-btn ${cls}" onclick="showModal(${i})"${title ? ` title="${title}"` : ''}>${text}</button>`;
+    let html = '';
+    if (rels.equivalences.length) html += cdRow('Consistent with', rels.equivalences.map(r => link(r.id, r.idx, 'equiv-btn', `${r.direction === 'to' ? '→' : '←'} ${r.label}`, 'Consistent with')).join(''));
+    if (rels.subtypeOf.length) html += cdRow('Subtype of', rels.subtypeOf.map(r => link(r.id, r.idx, 'subtype-btn', `↑ ${r.label}`)).join(''));
+    if (rels.hasSubtypes.length) html += cdRow('Has proposed subtypes', rels.hasSubtypes.map(r => link(r.id, r.idx, 'subtype-btn', `↓ ${r.label}`)).join(''));
+    if (ct.relatedCells && ct.relatedCells.length) {
+        html += cdRow('Species variants', ct.relatedCells.map(rc => {
+            if (!useLinks) return `<button class="related-cell-btn" onclick="openCellById('${rc.id}')">${rc.label}</button>`;
+            const ri = rc.id ? (ID_INDEX[rc.id] ?? -1) : -1;
+            return ri !== -1 ? `<a href="#cell/${CELL_TYPES[ri].id}" class="related-cell-btn">${rc.label}</a>` : `<span class="related-cell-btn">${rc.label}</span>`;
+        }).join(''));
     }
-    const notesHtml = (ct.alertNotes && ct.alertNotes.length > 0) || (ct.curatorNotes && ct.curatorNotes.length > 0) ? `<div class="detail-section"><h3>📝 Notes</h3><div style="padding:0.5rem 0.75rem;background:#fef9c3;border:1px solid #eab308;border-radius:6px;font-size:0.9rem;line-height:1.5;">${ct.alertNotes && ct.alertNotes.length > 0 ? `<div style="margin-bottom:${ct.curatorNotes && ct.curatorNotes.length > 0 ? '1rem' : '0'};"><strong style="color:#b45309;">⚠️ Alert Notes:</strong>${ct.alertNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}${ct.curatorNotes && ct.curatorNotes.length > 0 ? `<div><strong style="color:#1e40af;">📋 Curator Notes:</strong>${ct.curatorNotes.map(n => `<p style="margin:0.5rem 0 0.5rem 1rem;">${linkifyUrls(n)}</p>`).join('')}</div>` : ''}</div></div>` : '';
-    return `<div class="detail-section">${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as"><em>Also known as: ${ct.localLabel}</em></p>` : ''}<p><strong>Entity:</strong> ${ct.entity}</p><p><strong>Species:</strong> ${ct.species}</p><p><strong>Soma Location:</strong> ${(ct.somaLocations||[ct.somaLocation]).join(', ')}</p>${ct.subClassOf&&ct.subClassOf.length?`<p><strong>Subclass Of:</strong> ${ct.subClassOf.join(', ')}</p>`:''}${ct.sensoryTerminalLocations&&ct.sensoryTerminalLocations.length?`<p><strong>Sensory Terminal Location:</strong> ${ct.sensoryTerminalLocations.join(', ')}</p>`:''}${ct.axonTerminalLocations&&ct.axonTerminalLocations.length?`<p><strong>Axon Terminal Location:</strong> ${ct.axonTerminalLocations.join(', ')}</p>`:''}${ct.circuitRole?`<p><strong>Circuit Role:</strong> ${ct.circuitRole}${ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''}</p>`:''}${ct.creLine?`<p><strong>Cre Line:</strong> ${ct.creLine}</p>`:''}</div>${mapsToHtml}${relatedHtml}${precisionHtml}${ct.markerGenes&&ct.markerGenes.length?`<div class="detail-section"><h3>🧬 Marker Genes</h3><div class="gene-grid">${ct.markerGenes.map(g=>`<a href="${g.uri}" target="_blank" class="gene-link">${g.name}${g.expression?`<sup>${g.expression}</sup>`:''}${g.expressionLevel?`<span class="method-badge expr-level">${g.expressionLevel}</span>`:''}${g.determinedBy?`<span class="method-badge">${g.determinedBy}</span>`:''} ↗</a>`).join('')}</div></div>`:''}${ct.fiberTypeString?`<div class="detail-section"><h3>🔬 Axon Phenotype${ct.fiberTypeMethods?ct.fiberTypeMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f7fafc;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #e2e8f0;">${formatFiberType(formatGeneExpression(ct.fiberTypeString))}</div></div>`:''}${ct.physiologyString?`<div class="detail-section"><h3>⚡ Physiology${ct.physiologyMethods?ct.physiologyMethods.map(m=>`<span class="method-badge">${m}</span>`).join(''):''}</h3><div style="padding:0.5rem 0.75rem;background:#f0fdf4;border-radius:6px;font-size:0.9rem;font-weight:600;color:#2d3748;line-height:1.5;border:1px solid #bbf7d0;">${formatGeneExpression(ct.physiologyString)}</div></div>`:''}${sourceLinkHtml}${sourceDataHtml}${notesHtml}`;
+    return html;
+}
+
+function buildPrecisionHTML(ct) {
+    if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2025' || !ct.markerGenes || !ct.markerGenes.length) return '';
+    const genes = [...new Set(ct.markerGenes.filter(g => g.name).map(g => g.name.toUpperCase()))].filter(g => PRECISION_GENES.has(g));
+    if (!genes.length) return '';
+    return cdRow('PRECISION atlas', `Gene expression distribution by cell type ` + genes.map(gene => {
+        const url = `${PRECISION_BASE_URL}?dashboard=genedistribution&gene=${encodeURIComponent(gene)}&metadataColumn=${encodeURIComponent('Atlas_annotation')}`;
+        return `<a href="${url}" target="_blank" class="cd-pill"><span class="cd-mono">${gene}</span> ↗</a>`;
+    }).join(''));
+}
+
+function buildCellDetailHTML(idx, useLinks) {
+    const ct = CELL_TYPES[idx];
+
+    let subject = cdRow('Species', ct.species);
+    if (ct.biologicalSex && ct.biologicalSex.length) subject += cdRow('Sex', ct.biologicalSex.join(', '), true);
+    if (ct.observedAge) subject += cdRow('Observed at age', buildAgeHTML(ct.observedAge, idx), true);
+    subject += buildSomaRowsHTML(ct);
+    if (ct.subClassOf && ct.subClassOf.length) subject += cdRow('Subclass of', ct.subClassOf.join(', '));
+    if (ct.sensoryTerminalLocations && ct.sensoryTerminalLocations.length) subject += cdRow('Sensory terminal', ct.sensoryTerminalLocations.join(', '));
+    if (ct.axonTerminalLocations && ct.axonTerminalLocations.length) subject += cdRow('Axon terminal', ct.axonTerminalLocations.join(', '));
+    if (ct.circuitRole) subject += cdRow('Circuit role', ct.circuitRole + (ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''));
+    if (ct.creLine) subject += cdRow('Cre line', ct.creLine);
+
+    const relRows = buildRelationshipRowsHTML(idx, useLinks);
+
+    let phenotype = '';
+    if (ct.markerGenes && ct.markerGenes.length) {
+        phenotype += cdRow('Marker genes', ct.markerGenes.map(g => `<a href="${g.uri}" target="_blank" class="cd-pill">${g.name}${g.expression ? `<sup>${g.expression}</sup>` : ''}${g.expressionLevel ? `<span class="method-badge expr-level">${g.expressionLevel}</span>` : ''}${g.determinedBy ? `<span class="method-badge">${g.determinedBy}</span>` : ''} ↗</a>`).join(''));
+    }
+    if (ct.fiberTypeString) phenotype += cdRow('Axon', formatFiberType(formatGeneExpression(ct.fiberTypeString)) + cdBadges(ct.fiberTypeMethods));
+    if (ct.physiologyString) phenotype += cdRow('Physiology', formatGeneExpression(ct.physiologyString) + cdBadges(ct.physiologyMethods));
+    phenotype += buildPrecisionHTML(ct);
+    if (ct.sourceData && ct.sourceData.length) phenotype += cdRow('Source data', ct.sourceData.map(sd => `<a href="${sd.uri}" target="_blank" class="source-link">${sd.label} ↗</a>`).join('<br>'));
+
+    const alerts = (ct.alertNotes || []).map(n => `<p class="cd-alert">⚠ ${linkifyUrls(n)}</p>`).join('');
+    const curator = (ct.curatorNotes || []).map(n => `<p>${linkifyUrls(n)}</p>`).join('');
+
+    // In the modal there is no page header, so show the alias and source here.
+    const modalMeta = useLinks ? '' :
+        `${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as">Also known as: ${ct.localLabel}</p>` : ''}${buildSourceLine(ct, true)}`;
+
+    return `<div class="cd">${modalMeta}` +
+        `<div class="cd-top">` +
+            `<section><div class="cd-sh">Subject and location</div><dl class="cd-dl">${subject}</dl></section>` +
+            `<section>${relRows ? `<div class="cd-sh">Proposed relationships</div><dl class="cd-dl">${relRows}</dl>` : ''}</section>` +
+        `</div>` +
+        (phenotype ? `<section><div class="cd-sh">Phenotype</div><dl class="cd-dl">${phenotype}</dl></section>` : '') +
+        (alerts ? `<section><div class="cd-sh">Alert notes</div><div class="cd-notes">${alerts}</div></section>` : '') +
+        (curator ? `<section><div class="cd-sh">Curator notes</div><div class="cd-notes">${curator}</div></section>` : '') +
+    `</div>`;
 }
 
 function buildRelatedSourceCellsHTML(idx) {
@@ -2750,16 +2799,15 @@ function buildRelatedSourceCellsHTML(idx) {
     const sourceCells = CELL_TYPES.map((c, i) => ({cell: c, idx: i}))
         .filter(item => item.idx !== idx && item.cell.sourceNomenclatureLabel === ct.sourceNomenclatureLabel);
     if (sourceCells.length === 0) return '';
-    return `<div class="detail-section"><h3>📋 Other cells from ${ct.sourceNomenclatureLabel} (${sourceCells.length})</h3><div class="related-source-cards-grid">${sourceCells.map(item => {
+    return `<details class="cd-other"><summary>Other cells from ${ct.sourceNomenclatureLabel} (${sourceCells.length})</summary><div class="related-source-cards-grid">${sourceCells.map(item => {
         const c = item.cell;
         const axonBadge = c.clusterAttributes.fiber_a_beta ? '<span class="card-badge axon">Aβ</span>' : c.clusterAttributes.fiber_a_delta ? '<span class="card-badge axon">Aδ</span>' : c.clusterAttributes.fiber_c ? '<span class="card-badge axon">C</span>' : '';
         const rels = getAssertedRelationships(item.idx);
         const hasAnyRel = rels.equivalences.length > 0 || rels.subtypeOf.length > 0 || rels.hasSubtypes.length > 0;
         const equivBadge = hasAnyRel ? '<span class="card-badge equiv" title="Has proposed relationships">≡</span>' : '';
-        return `<a href="#cell/${c.id}" class="card-compact card-compact-link" style="border-left-color:${c.sourceColor||'#667eea'};text-decoration:none;color:inherit;display:block;margin-bottom:0;"><div class="card-compact-header" style="cursor:pointer;"><div class="card-compact-info"><div class="card-npokb-id">${c.id||''}</div><div class="card-compact-name">${c.preferredLabel}</div><div class="card-compact-meta">${c.species} · ${(c.somaLocations||[]).join(', ') || 'Unknown location'}</div></div><div class="card-compact-badges">${axonBadge}${equivBadge}</div></div></a>`;
-    }).join('')}</div></div>`;
+        return `<a href="#cell/${c.id}" class="card-compact card-compact-link"><div class="card-compact-header"><div class="card-compact-info"><div class="card-npokb-id">${c.id||''}</div><div class="card-compact-name">${c.preferredLabel}</div><div class="card-compact-meta">${c.species} · ${(c.somaLocations||[]).join(', ') || 'Unknown location'}</div></div><div class="card-compact-badges">${axonBadge}${equivBadge}</div></div></a>`;
+    }).join('')}</div></details>`;
 }
-
 function renderCellDetailView(idx) {
     closeModal();
     const ct = CELL_TYPES[idx];
@@ -2767,7 +2815,7 @@ function renderCellDetailView(idx) {
     document.getElementById('cellDetailContent').innerHTML =
         `<div class="cell-detail-page">` +
             `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
-            `<div class="cell-detail-header"><div class="cell-detail-source-bar" style="background:${ct.sourceColor||'#667eea'};"></div><div class="card-npokb-id">${ct.id||''}${(ct.baseClass||'neuron')!=='neuron'?'<span class="base-class-badge">Non-neuronal</span>':''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as" style="margin:-0.5rem 0 0.5rem;"><em>Also known as: ${ct.localLabel}</em></p>` : ''}${buildSourceLine(ct)}</div>` +
+            `<div class="cell-detail-header"><div class="card-npokb-id">${ct.id||''}${ct.entity ? `<span class="cd-entity">${ct.entity}</span>` : ''}${(ct.baseClass||'neuron')!=='neuron'?'<span class="base-class-badge">Non-neuronal</span>':''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as">Also known as: ${ct.localLabel}</p>` : ''}${buildSourceLine(ct, true)}</div>` +
             `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
             buildRelatedSourceCellsHTML(idx) +
         `</div>`;

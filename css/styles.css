@@ -39,13 +39,13 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .filter-count { font-size: 0.85rem; color: #4a5568; padding: 0.5rem 1rem; background: #f0f4ff; border-radius: 6px; }
 
 /* Compact Accordion Cards */
-.card-compact { background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border-left: 4px solid #667eea; margin-bottom: 0.75rem; overflow: hidden; transition: all 0.2s; }
-.card-compact:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-.card-compact-header { padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
-.card-compact-header:hover { background: #f8fafc; }
+.card-compact { background: white; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 0.75rem; overflow: hidden; transition: border-color 0.15s; }
+.card-compact:hover { border-color: #a0aec0; }
+.card-compact-header { padding: 0.6rem 0.85rem; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
 .card-npokb-id { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 0.7rem; font-weight: 600; color: #718096; letter-spacing: 0.03em; margin-bottom: 1px; }
 .card-source-line { font-size: 0.75rem; margin-top: 3px; color: #718096; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-source-name { font-weight: 600; }
+.card-source-name { font-weight: 600; color: #4a5568; }
+.source-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35em; vertical-align: 0; }
 .card-source-doi { color: #718096; text-decoration: none; }
 .card-source-doi:hover { text-decoration: underline; color: #4a5568; }
 .card-source-sep { margin: 0 0.3em; color: #cbd5e0; }
@@ -63,10 +63,19 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .card-expand-btn.expanded { transform: rotate(180deg); }
 .card-compact-detail { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
 .card-compact-detail.expanded { max-height: 1000px; }
-.card-compact-detail-inner { padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.card-compact-detail-inner { padding: 0.75rem 0.85rem; border-top: 1px solid #e2e8f0; }
+.card-compact-detail .card-section { margin-top: 0.5rem; }
+.card-compact-detail .section-title { font-size: 0.75rem; font-weight: 500; color: #a0aec0; margin-bottom: 0.2rem; }
+.card-compact-detail .gene-display { padding: 0; background: none; border: none; font-size: 0.85rem; font-weight: 500; }
+.card-compact-detail .asserted-relationships { margin-top: 0.5rem; padding: 0; background: none; border: none; }
+.card-compact-detail .asserted-relationships-title { font-size: 0.75rem; font-weight: 500; color: #a0aec0; margin-bottom: 0.2rem; }
+.card-compact-detail .asserted-equiv-section { margin-bottom: 0.3rem; }
+.card-compact-detail .asserted-subtype-section { margin-top: 0.3rem; padding-top: 0; border-top: none; }
+.card-compact-detail .related-cell-btn { padding: 0.1rem 0.6rem; margin: 0 0.3rem 0.25rem 0; font-size: 0.78rem; }
+.card-compact-detail .related-cells { gap: 0; }
 
 /* Cards grid for compact view */
-.cards-compact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
+.cards-compact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; align-items: start; }
 
 .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
 .modal.show { display: flex; align-items: center; justify-content: center; }
@@ -430,20 +439,55 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .cell-detail-back { margin-bottom: 1rem; }
 .cell-detail-back a { color: #667eea; text-decoration: none; font-size: 0.95rem; }
 .cell-detail-back a:hover { text-decoration: underline; }
-.cell-detail-header { margin-bottom: 1.5rem; }
-.cell-detail-header h1 { font-size: 1.5rem; color: #2d3748; margin: 0.25rem 0; }
-.cell-detail-source-bar { height: 4px; border-radius: 2px; margin-bottom: 0.5rem; }
+.cell-detail-header { margin-bottom: 0.5rem; }
+.cell-detail-header h1 { font-size: 1.4rem; color: #2d3748; margin: 0.1rem 0; }
+.cell-detail-header .also-known-as { margin: 0; }
 .cell-detail-source-label { font-size: 0.85rem; font-weight: 600; }
-.cell-detail-header .card-npokb-id { font-size: 1rem; }
-.cell-detail-header .card-source-line { font-size: 1rem; }
+.cell-detail-header .card-npokb-id { font-size: 0.85rem; }
+.cell-detail-header .card-source-line { font-size: 0.9rem; }
 .cell-detail-header .npokb-copy-btn { font-size: 0.85rem; }
-.cell-detail-body { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.cell-detail-body { padding: 0; }
 .cell-detail-actions { margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center; }
 .detail-section { margin-top: 1.5rem; }
 .detail-section h3 { color: #2d3748; font-size: 1.1rem; margin-bottom: 0.75rem; }
 .related-source-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
 .card-compact-link { text-decoration: none; color: inherit; display: block; }
-.card-compact-link:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+.card-compact-link:hover { border-color: #a0aec0; }
+
+/* Compact cell detail (modal and full page) */
+.cd { font-size: 0.88rem; line-height: 1.45; color: #2d3748; }
+.cd section { min-width: 0; }
+.cd-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 2rem; }
+.cd-sh { font-size: 0.75rem; color: #a0aec0; margin: 0.75rem 0 0.3rem; padding-top: 0.5rem; border-top: 1px solid #edf2f7; }
+.cd-dl { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); column-gap: 0.75rem; row-gap: 0.2rem; margin: 0; }
+.cd-dl dt { color: #718096; }
+.cd-dl dt.cd-sub { padding-left: 0.75rem; }
+.cd-dl dd { margin: 0; min-width: 0; }
+.cd-cap { text-transform: capitalize; }
+.cd-muted { color: #a0aec0; }
+.cd-mono { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }
+.cd-entity { margin-left: 0.6rem; font-family: inherit; font-weight: 400; color: #a0aec0; letter-spacing: 0; }
+.cd-toggle { background: none; border: none; padding: 0; color: #667eea; cursor: pointer; font-size: inherit; }
+.cd-toggle:hover { text-decoration: underline; }
+.cd-age-list { margin-top: 0.2rem; color: #4a5568; }
+.cd-pill { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.2rem; padding: 0.05rem 0.55rem; margin: 0 0.3rem 0.25rem 0; border: 1px solid #cbd5e0; border-radius: 12px; max-width: 100%; font-size: 0.8rem; color: #2d3748; text-decoration: none; }
+.cd-pill:hover { border-color: #667eea; color: #667eea; }
+.cd .related-cell-btn { padding: 0.1rem 0.6rem; margin: 0 0.3rem 0.25rem 0; font-size: 0.78rem; }
+.cd .method-badge { margin-left: 0.25rem; }
+.cd-notes p { margin: 0 0 0.25rem; }
+.cd-alert { color: #b45309; }
+.cd .also-known-as { margin: 0; }
+.cd > .card-source-line { margin: 0.1rem 0 0; }
+.cd-other { margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #edf2f7; }
+.cd-other summary { cursor: pointer; font-size: 0.85rem; color: #718096; margin-bottom: 0.5rem; }
+@media (max-width: 720px) {
+    .cd-top { grid-template-columns: minmax(0, 1fr); }
+    .cd-dl { grid-template-columns: 7.5rem minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+    .cd-dl { grid-template-columns: 6.25rem minmax(0, 1fr); column-gap: 0.5rem; }
+    .cd-dl dt.cd-sub { padding-left: 0.5rem; }
+}
 
 /* ── Source References Legend ────────────────────────────────────── */
 .source-references { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; padding: 0.6rem 1.5rem; font-size: 0.8rem; }

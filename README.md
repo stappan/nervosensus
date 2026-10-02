@@ -40,7 +40,7 @@ Cell types are linked across sources through two relationship types:
 
 ### Per-cell data fields
 
-Each cell type record includes: `id` (npokb CURIE), `baseClass` ("neuron" or "cell"), preferred label, entity ID, species, soma location(s), circuit role, neurotransmitter, Cre line, marker gene expression string, individual marker genes (with URIs, expression level, and determinedByMethod), axon/fiber type phenotype (with methods), physiology string (with methods), source publication DOI, source data links, alert notes, curator notes, related species variants (by ID), asserted subclass-of relationships (by ID), maps-to equivalences (by ID), and cluster visualization attributes.
+Each cell type record includes: `id` (npokb CURIE), `baseClass` ("neuron" or "cell"), preferred label, entity ID, species, biological sex, observed-at-age summary (`observedAge`: verbatim value list, numeric min/max, non-numeric entries, count), soma location(s), spinal regions and segments for DRG cells (`spinalRegions`, from UBERON segment IRIs), circuit role, neurotransmitter, Cre line, marker gene expression string, individual marker genes (with URIs, expression level, and determinedByMethod), axon/fiber type phenotype (with methods), physiology string (with methods), source publication DOI, source data links, alert notes, curator notes, related species variants (by ID), asserted subclass-of relationships (by ID), maps-to equivalences (by ID), and cluster visualization attributes.
 
 ---
 
@@ -52,7 +52,7 @@ The default view. Displays cell types as expandable cards in a responsive grid. 
 
 **Filter bar** — Filter cards by source, species, soma location, circuit role, and text search. The filter count updates live.
 
-**Detail modal** — Shows full cell information including a base-class badge (neuron/cell), marker genes (with links to ontology URIs, expression level badges, and determinedByMethod badges), axon phenotype (with method badges), physiology (with method badges), asserted relationships (equivalences and subtypes as clickable buttons that navigate between cells by ID), source publication link, source data links, and curator/alert notes.
+**Detail modal / full page** — Compact label/value layout: subject and location (species, sex, observed-at-age summary with a "show all" list, soma location with every spinal region listed and its segments or "no data") top left; proposed relationships top right; phenotype, alert notes, and curator notes full width; other cells from the same source collapsed at the bottom. Shows full cell information including a base-class badge (neuron/cell), marker genes (with links to ontology URIs, expression level badges, and determinedByMethod badges), axon phenotype (with method badges), physiology (with method badges), asserted relationships (equivalences and subtypes as clickable buttons that navigate between cells by ID), source publication link, source data links, and curator/alert notes.
 
 ### 🌳 Tree View
 
@@ -126,7 +126,7 @@ A side-by-side comparison view for examining cross-source cell type alignments. 
 
 ## Data Pipeline
 
-Cell type data is generated from a source XLSX spreadsheet using `sync_data.py`, which reads the NPO property rows and produces `js/data.js`. The script validates that every cell has an npokb ID, excludes "don't add" rows, classifies cells by base class (neuron vs. cell), deduplicates marker genes by base name, and captures determinedByMethod and expression level metadata. Pass `--max-row N` to ingest only sheet rows 2–N (e.g. `python sync_data.py forNervoSensus2extended.xlsx --max-row 3612`); the row limit is recorded in `DATA_VERSION.sourceMaxRow`.
+Cell type data is generated from a source XLSX spreadsheet using `sync_data.py`, which reads the NPO property rows and produces `js/data.js`. The script validates that every cell has an npokb ID, excludes "don't add" rows, classifies cells by base class (neuron vs. cell), deduplicates marker genes by base name, and captures determinedByMethod and expression level metadata. Rows are grouped by npokb ID, so later row blocks for a cell merge into it even if their Neuron ID text differs. Spinal segment rows (UBERON segment-level DRG IRIs) are kept out of `somaLocations` so the tree and cluster views are unaffected. Pass `--max-row N` to ingest only sheet rows 2–N (e.g. `python sync_data.py forNervoSensus2extended.xlsx --max-row 3612`); the row limit is recorded in `DATA_VERSION.sourceMaxRow`.
 
 NervoSensus ships with all 153 cell types embedded in `js/data.js`. It can also load external data at runtime:
 

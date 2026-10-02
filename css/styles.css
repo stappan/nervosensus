@@ -466,7 +466,7 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .cd-cap { text-transform: capitalize; }
 .cd-muted { color: #a0aec0; }
 .cd-mono { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }
-.cd-entity { margin-left: 0.6rem; font-family: inherit; font-weight: 400; color: #a0aec0; letter-spacing: 0; }
+.cd-entity { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 0.85rem; color: #a0aec0; }
 .cd-toggle { background: none; border: none; padding: 0; color: #667eea; cursor: pointer; font-size: inherit; }
 .cd-toggle:hover { text-decoration: underline; }
 .cd-age-list { margin-top: 0.2rem; color: #4a5568; }

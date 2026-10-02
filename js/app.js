@@ -2815,7 +2815,7 @@ function renderCellDetailView(idx) {
     document.getElementById('cellDetailContent').innerHTML =
         `<div class="cell-detail-page">` +
             `<div class="cell-detail-back"><a href="#" onclick="history.back();return false;">← Back to ${viewLabel}</a></div>` +
-            `<div class="cell-detail-header"><div class="card-npokb-id">${ct.id||''}${ct.entity ? `<span class="cd-entity">${ct.entity}</span>` : ''}${(ct.baseClass||'neuron')!=='neuron'?'<span class="base-class-badge">Non-neuronal</span>':''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div><h1>${ct.preferredLabel}</h1>${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as">Also known as: ${ct.localLabel}</p>` : ''}${buildSourceLine(ct, true)}</div>` +
+            `<div class="cell-detail-header"><div class="card-npokb-id">${ct.id||''}${(ct.baseClass||'neuron')!=='neuron'?'<span class="base-class-badge">Non-neuronal</span>':''}<button class="npokb-copy-btn" onclick="copyCellDetailLink()" title="Copy cell link">📋</button></div>${ct.entity ? `<div class="cd-entity">${ct.entity}</div>` : ''}<h1>${ct.preferredLabel}</h1>${ct.localLabel && ct.localLabel !== ct.preferredLabel ? `<p class="also-known-as">Also known as: ${ct.localLabel}</p>` : ''}${buildSourceLine(ct, true)}</div>` +
             `<div class="cell-detail-body">${buildCellDetailHTML(idx, true)}</div>` +
             buildRelatedSourceCellsHTML(idx) +
         `</div>`;
@@ -3724,6 +3724,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.cluster-controls .attr-btn').forEach(btn=>{btn.addEventListener('click',()=>handleAttrClick(btn));});
     window.addEventListener('hashchange', handleHashChange);
 
+    // switchView() below strips a #cell/ hash, so capture it first
+    const initialHash = location.hash;
+
     // Deep-link support: parse URL parameters to set view and filters
     // Example: ?view=cards&source=big+DRG+paper&species=mouse&axon=fiber_c&location=soma_drg&gene=Trpv1&equiv=yes&cell=CLTM1
     const params = new URLSearchParams(window.location.search);
@@ -3857,8 +3860,12 @@ document.addEventListener('DOMContentLoaded', () => {
         switchView('cluster');
     }
 
-    // Handle initial hash (e.g. direct link to #cell/npokb:915)
-    if (location.hash.match(/^#cell\/.+$/)) {
+    // Handle initial hash (e.g. direct link to #cell/npokb:915). The view opened
+    // above becomes the previous history entry, so "Back to ..." (history.back)
+    // returns to it even in a fresh tab.
+    if (/^#cell\/.+$/.test(initialHash)) {
+        history.replaceState(null, '', location.pathname + location.search);
+        history.pushState(null, '', location.pathname + location.search + initialHash);
         handleHashChange();
     }
 });

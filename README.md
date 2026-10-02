@@ -13,7 +13,7 @@ NervoSensus is a client-side web application for exploring 153 somatosensory cel
 | Source | Cells | Color | DOI |
 |--------|------:|-------|-----|
 | Bhuiyan et al., 2024 | 54 | Purple | [10.1126/sciadv.adj9173](https://doi.org/10.1126/sciadv.adj9173) |
-| Bhuiyan et al., 2025 | 31 | Amber | [10.1101/2025.11.05.686654](https://doi.org/10.1101/2025.11.05.686654) |
+| Bhuiyan et al., 2025 | 32 | Amber | [bioRxiv 10.1101/2025.11.05.686654](https://www.biorxiv.org/content/10.1101/2025.11.05.686654v1) |
 | Krauter et al., 2025 | 22 | Violet | [10.1038/s42003-025-08315-1](https://doi.org/10.1038/s42003-025-08315-1) |
 | Qi et al., 2024 | 17 | Cyan | [10.1016/j.cell.2024.02.006](https://doi.org/10.1016/j.cell.2024.02.006) |
 | Yu et al., 2024 | 16 | Red | [10.1038/s41593-024-01794-1](https://doi.org/10.1038/s41593-024-01794-1) |
@@ -126,7 +126,7 @@ A side-by-side comparison view for examining cross-source cell type alignments. 
 
 ## Data Pipeline
 
-Cell type data is generated from a source XLSX spreadsheet using `sync_data.py`, which reads the NPO property rows and produces `js/data.js`. The script validates that every cell has an npokb ID, excludes "don't add" rows, classifies cells by base class (neuron vs. cell), deduplicates marker genes by base name, and captures determinedByMethod and expression level metadata.
+Cell type data is generated from a source XLSX spreadsheet using `sync_data.py`, which reads the NPO property rows and produces `js/data.js`. The script validates that every cell has an npokb ID, excludes "don't add" rows, classifies cells by base class (neuron vs. cell), deduplicates marker genes by base name, and captures determinedByMethod and expression level metadata. Pass `--max-row N` to ingest only sheet rows 2–N (e.g. `python sync_data.py forNervoSensus2extended.xlsx --max-row 3612`); the row limit is recorded in `DATA_VERSION.sourceMaxRow`.
 
 NervoSensus ships with all 153 cell types embedded in `js/data.js`. It can also load external data at runtime:
 

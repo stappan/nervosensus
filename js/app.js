@@ -37,9 +37,10 @@ let clusterWidth = 0, clusterHeight = 0;
 let clusterNodeSelection = null;
 
 // Species labels used instead of icons
-const ATTR_LABELS = { source_0:'Bhuiyan et al., 2024', source_1:'Bhuiyan et al., 2025', source_2:'Tavares-Ferreira et al., 2022', source_3:'Yu et al., 2024', source_4:'Krauter et al., 2025', source_5:'Qi et al., 2024',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprioceptive', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'Guinea Pig', soma_drg:'DRG', soma_tg:'Trigeminal' };
-const ATTR_SHORT = { source_0:'Bhuiyan 2024', source_1:'Bhuiyan 2025', source_2:'Tavares-Ferreira 2022', source_3:'Yu 2024', source_4:'Krauter 2025', source_5:'Qi 2024',  cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprio', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'G.Pig', soma_drg:'DRG', soma_tg:'TG' };
-const SOURCE_URLS = {"source_0": "https://doi.org/10.1126/sciadv.adj9173", "source_1": "https://doi.org/10.1101/2025.11.05.686654", "source_2": "https://doi.org/10.1126/scitranslmed.abj8186", "source_3": "https://doi.org/10.1038/s41593-024-01794-1", "source_4": "https://doi.org/10.1038/s42003-025-08315-1", "source_5": "https://doi.org/10.1016/j.cell.2024.02.006"};
+const ATTR_LABELS = { cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprioceptive', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'Guinea Pig', soma_drg:'DRG', soma_tg:'Trigeminal' };
+const ATTR_SHORT = { cold_sensitive:'Cold', heat_sensitive:'Heat', mechanosensitive_ltm:'LTM', mechanosensitive_htm:'HTM', proprioceptive:'Proprio', rapidly_adapting:'RA', slowly_adapting:'SA', fiber_a_beta:'Aβ', fiber_a_delta:'Aδ', fiber_c:'C', species_mouse:'Mouse', species_human:'Human', species_macaque:'Macaque', species_guinea_pig:'G.Pig', soma_drg:'DRG', soma_tg:'TG' };
+// source_N attribute -> citation URL; filled from SOURCES by initSourceButtons()
+let SOURCE_URLS = {};
 const PRECISION_BASE_URL = 'https://sparc.science/apps/precision-dashboard';
 const PRECISION_GENES = new Set(["ADORA2B", "ADRA2A", "ADRA2C", "AGT", "ALDH1A1", "ASIC1", "ATF3", "AVPR1A", "BMPR1B", "CACNA1I", "CACNG5", "CALB1", "CALCA", "CASQ2", "CCK", "CCKAR", "CDH9", "CHRNA3", "CHRNA7", "CPNE6", "CUX2", "DCN", "EPHA3", "ETV1", "FOXP2", "GFRA1", "GFRA2", "GFRA3", "GPR68", "GRM8", "GRXCR2", "HAPLN4", "HRH1", "IL31RA", "IL3RA", "KCNS1", "KIT", "LGI2", "MRGPRD", "MRGPRX1", "MRGPRX4", "NGEF", "NPPB", "NSG2", "NTRK2", "NTRK3", "OPRD1", "OPRK1", "OPRM1", "PCDH8", "PENK", "PIEZO2", "PNOC", "PROKR2", "PTGIR", "PTPRT", "PVALB", "REEP5", "RXFP1", "S100A16", "S100A4", "SCGN", "SCN10A", "SCN11A", "SLC18A3", "SST", "SSTR2", "STUM", "SYT17", "TAC1", "TAC3", "TH", "TRPA1", "TRPM2", "TRPM8", "TRPV1"]);
 // Atlas annotation → Bhuiyan 2025 cell preferredLabel (from ilxtr:atlasAnnotation in PRECISIONcelltypeNPO.xlsx,
@@ -441,6 +442,20 @@ function toggleAttrGroup(group) {
         content.classList.add('collapsed');
         toggle.textContent = '▶';
     }
+}
+
+// Build the cluster Source filter from SOURCES (data.js) rather than a fixed list.
+// Listeners are attached with the other .cluster-controls buttons on DOMContentLoaded.
+function initSourceButtons() {
+    const container = document.getElementById('attr-group-source');
+    SOURCE_URLS = {};
+    container.innerHTML = Object.entries(SOURCES).map(([url, src], i) => {
+        const attr = `source_${i}`;
+        SOURCE_URLS[attr] = url;
+        ATTR_LABELS[attr] = src.label;
+        ATTR_SHORT[attr] = src.label.replace(/ et al\.,?/, '');
+        return `<button class="attr-btn" data-attr="${attr}">${src.label}</button>`;
+    }).join('');
 }
 
 function initGeneButtons() {
@@ -3653,6 +3668,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDataStatus();
     renderSourcesFooter();
     renderCards();
+    initSourceButtons();
     initGeneButtons();
     document.querySelectorAll('.view-btn').forEach(btn=>{btn.addEventListener('click',()=>switchView(btn.dataset.view));});
     document.getElementById('modal').addEventListener('click',(e)=>{if(e.target.id==='modal')closeModal();});

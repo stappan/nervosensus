@@ -2785,7 +2785,7 @@ function buildCellDetailHTML(idx, useLinks) {
 
     return `<div class="cd">${modalMeta}` +
         `<div class="cd-top">` +
-            `<section><div class="cd-sh">Subject and location</div><dl class="cd-dl">${subject}</dl></section>` +
+            `<section><div class="cd-sh">Experimental context</div><div class="cd-subh">Studied in</div><dl class="cd-dl">${subject}</dl></section>` +
             `<section>${relRows ? `<div class="cd-sh">Proposed relationships</div><dl class="cd-dl">${relRows}</dl>` : ''}</section>` +
         `</div>` +
         (phenotype ? `<section><div class="cd-sh">Phenotype</div><dl class="cd-dl">${phenotype}</dl></section>` : '') +

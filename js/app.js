@@ -1722,7 +1722,7 @@ function clearEquivHighlight() { clearRelationshipHighlights(); }
 
 function getClusterBaseClassFilter() { const el = document.getElementById('clusterBaseClassFilter'); return el ? el.value : 'neuron'; }
 function onClusterBaseClassChange() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); initClusterView(); updateClusterStats(); updateClusterLegend(); }
-function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); const baseClassFilter=getClusterBaseClassFilter(); const filteredCells=CELL_TYPES.map((ct,i)=>({ct,i})).filter(x=>(x.ct.baseClass||'neuron')===baseClassFilter); clusterNodes=filteredCells.map(x=>({...x.ct,idx:x.i,id:x.i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); updateClusterStats(); updateClusterLegend(); }
+function initClusterView() { const svg=d3.select('#clusterSvg'); const container=document.querySelector('.cluster-viz-area'); if(!container||container.clientWidth===0){setTimeout(initClusterView,50);return;} clusterWidth=container.clientWidth; clusterHeight=container.clientHeight; nodeRadius=Math.max(8,Math.min(14,Math.min(clusterWidth,clusterHeight)/60)); svg.attr('width',clusterWidth).attr('height',clusterHeight); svg.selectAll('*').remove(); svg.append('g').attr('class','enclosures'); svg.append('g').attr('class','nodes'); svg.append('g').attr('class','labels'); const baseClassFilter=getClusterBaseClassFilter(); const filteredCells=CELL_TYPES.map((ct,i)=>({ct,i})).filter(x=>baseClassFilter==='all'||(x.ct.baseClass||'neuron')===baseClassFilter); clusterNodes=filteredCells.map(x=>({...x.ct,idx:x.i,id:x.i,x:clusterWidth/2+(Math.random()-0.5)*clusterWidth*0.6,y:clusterHeight/2+(Math.random()-0.5)*clusterHeight*0.6,radius:nodeRadius})); clusterSimulation=d3.forceSimulation(clusterNodes).velocityDecay(0.45).alphaDecay(0.06).force('charge',d3.forceManyBody().strength(-30)).force('center',d3.forceCenter(clusterWidth/2,clusterHeight/2)).force('collision',d3.forceCollide().radius(d=>d.radius+1).strength(0.8)).on('tick',clusterTicked).on('end',drawClusterEnclosures); initGeneButtons(); updateClusterVisualization(); updateClusterStats(); updateClusterLegend(); }
 
 function clearAllFilters() { selectedAttributes=[]; document.querySelectorAll('.attr-btn.active').forEach(btn=>btn.classList.remove('active')); updateSelectedDisplay(); updateClusterLegend(); updateClusterStats(); updateClusterVisualization(); }
 function updateSelectedDisplay() { const display=document.getElementById('selectedAttrsDisplay'); if(selectedAttributes.length===0){display.textContent='No attributes selected';}else{const labels=selectedAttributes.map(a=>{if(a.startsWith('gene_')){const gene=GENES.find(g=>g.id===a);return gene?gene.display:a;}return ATTR_LABELS[a]||a;});display.textContent=`Selected (${labels.length}): ${labels.join(', ')}`;} }
@@ -1901,7 +1901,293 @@ function updateClusterStats() {
             html+=`<div class="stat-item"><span class="stat-label">All:</span><span class="stat-value" style="color:#FFD700;text-shadow:0 0 4px #FFA500;">${ic}</span></div>`;
         }
     } 
-    st.innerHTML=html; 
+    st.innerHTML=html;
+    if (clusterTableOpen) renderClusterTable();
+}
+
+// ============================================================
+// CLUSTER TABLE — the cluster's groups shown as an Align-style table
+// ============================================================
+let clusterTableOpen = false;
+let clusterTableExpanded = {};      // group key -> expanded?
+let clusterTableSelectionSig = '';  // resets expand state when the selection changes
+
+const CLUSTER_TABLE_COLUMNS = [
+    { key: 'name', label: 'Cell Type', type: 'name' },
+    { key: 'source', label: 'Source', type: 'source', attrs: a => a.startsWith('source_') },
+    { key: 'markerGenes', label: 'Marker Genes', type: 'genes', attrs: a => a.startsWith('gene_') },
+    { key: 'fiber_a_beta', label: 'Aβ', type: 'bool' },
+    { key: 'fiber_a_delta', label: 'Aδ', type: 'bool' },
+    { key: 'fiber_c', label: 'C', type: 'bool' },
+    { key: 'mechanosensitive_ltm', label: 'LTM', type: 'bool' },
+    { key: 'mechanosensitive_htm', label: 'HTM', type: 'bool' },
+    { key: 'temperature', label: 'Temp', type: 'temperature', attrs: a => a === 'cold_sensitive' || a === 'heat_sensitive' },
+    { key: 'proprioceptive', label: 'Proprio', type: 'bool' },
+    { key: 'rapidly_adapting', label: 'RA', type: 'bool' },
+    { key: 'slowly_adapting', label: 'SA', type: 'bool' },
+    { key: 'species', label: 'Species', type: 'text', attrs: a => a.startsWith('species_') },
+    { key: 'soma', label: 'Soma', type: 'soma', attrs: a => a.startsWith('soma_') },
+];
+
+function clusterColumnIsSelected(col) {
+    return selectedAttributes.some(a => col.attrs ? col.attrs(a) : a === col.key);
+}
+
+function shortSourceName(src) {
+    return (src || '').replace(/ et al\.,?/, '').replace(',', '');
+}
+
+function getClusterTableGroups() {
+    const pool = (clusterNodes && clusterNodes.length) ? clusterNodes : CELL_TYPES;
+    const groups = {};
+    pool.forEach(ct => {
+        const key = getClusterKey(ct);
+        if (!groups[key]) groups[key] = { key, shared: key.split('').filter(c => c === '1').length, cells: [] };
+        groups[key].cells.push(ct);
+    });
+    const list = Object.values(groups);
+    list.forEach(g => g.cells.sort((a, b) =>
+        (a.sourceNomenclatureLabel || '').localeCompare(b.sourceNomenclatureLabel || '') ||
+        (a.localLabel || a.preferredLabel || '').localeCompare(b.localLabel || b.preferredLabel || '')));
+    // Most shared attributes first, then larger groups, then by name
+    list.sort((a, b) => b.shared - a.shared || b.cells.length - a.cells.length || getClusterLabel(a.key).localeCompare(getClusterLabel(b.key)));
+    return list;
+}
+
+function getClusterTableSourceCounts(cells) {
+    const counts = {};
+    cells.forEach(ct => { const s = ct.sourceNomenclatureLabel || 'Unknown'; counts[s] = (counts[s] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function getClusterSelectedGeneBases() {
+    return new Set(selectedAttributes.filter(a => a.startsWith('gene_')).map(a => a.replace('gene_', '')));
+}
+
+function getClusterTableSoma(ct) {
+    const locs = ct.somaLocations && ct.somaLocations.length ? ct.somaLocations : [ct.somaLocation].filter(Boolean);
+    return locs.join(', ');
+}
+
+function clusterGroupIsExpanded(g) {
+    if (clusterTableExpanded[g.key] !== undefined) return clusterTableExpanded[g.key];
+    return g.shared > 0;  // the "None" group starts collapsed
+}
+
+function renderClusterTable() {
+    const prompt = document.getElementById('clusterTablePrompt');
+    const wrapper = document.getElementById('clusterTableWrapper');
+    const countEl = document.getElementById('clusterTableCount');
+    const hasSelection = selectedAttributes.length > 0;
+    prompt.hidden = hasSelection;
+    wrapper.hidden = !hasSelection;
+    document.getElementById('clusterTableExpandAll').hidden = !hasSelection;
+    document.getElementById('clusterTableExport').hidden = !hasSelection;
+    if (!hasSelection) { countEl.textContent = ''; return; }
+
+    const sig = selectedAttributes.join('|') + '::' + getClusterBaseClassFilter();
+    if (sig !== clusterTableSelectionSig) { clusterTableExpanded = {}; clusterTableSelectionSig = sig; }
+
+    const groups = getClusterTableGroups();
+    const total = groups.reduce((n, g) => n + g.cells.length, 0);
+    countEl.textContent = `${total} cells in ${groups.length} group${groups.length === 1 ? '' : 's'}`;
+    const geneBases = getClusterSelectedGeneBases();
+    const nCols = CLUSTER_TABLE_COLUMNS.length + 2;
+    const n = selectedAttributes.length;
+
+    let html = '<thead><tr><th></th><th></th>';
+    CLUSTER_TABLE_COLUMNS.forEach(col => {
+        const cls = [col.type === 'name' ? 'align-cell-name' : '', col.type === 'genes' ? 'align-genes-col' : '', clusterColumnIsSelected(col) ? 'cluster-col-selected' : ''].filter(Boolean).join(' ');
+        html += `<th${cls ? ` class="${cls}"` : ''}>${col.label}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    groups.forEach(g => {
+        const expanded = clusterGroupIsExpanded(g);
+        const sharedText = g.shared === 0 ? 'none shared' : (g.shared === n && n > 1 ? `all ${n} shared` : `${g.shared} of ${n} shared`);
+        const sources = getClusterTableSourceCounts(g.cells).map(([s, c]) => `${shortSourceName(s)} (${c})`).join(', ');
+        html += `<tr class="align-section-header cluster-group-header" onclick="toggleClusterTableGroup('${g.key}')"><td colspan="${nCols}">` +
+            `<span class="align-expand-icon${expanded ? ' expanded' : ''}">▶</span> ` +
+            `<span class="cluster-group-swatch" style="background:${getClusterColor(g.key)};"></span>` +
+            `<strong>${getClusterLabel(g.key)}</strong> — ${sharedText} — ${g.cells.length} cell${g.cells.length === 1 ? '' : 's'}` +
+            `<span class="cluster-group-sources"> · ${sources}</span></td></tr>`;
+        g.cells.forEach(ct => {
+            const idx = ct.idx !== undefined ? ct.idx : CELL_TYPES.indexOf(ct);
+            html += `<tr class="align-child-row" style="display:${expanded ? 'table-row' : 'none'};">`;
+            html += '<td></td>';
+            html += `<td class="view-cell" onclick="showModal(${idx})" title="View details"><span class="view-icon">👁</span></td>`;
+            CLUSTER_TABLE_COLUMNS.forEach(col => {
+                const sel = clusterColumnIsSelected(col) ? ' cluster-col-selected' : '';
+                if (col.type === 'name') {
+                    html += `<td class="align-cell-name${sel}" title="${ct.preferredLabel}">${ct.localLabel || ct.preferredLabel}</td>`;
+                } else if (col.type === 'source') {
+                    html += `<td class="align-source${sel}"><span style="color:${ct.sourceColor || '#667eea'}">${ct.sourceNomenclatureLabel || ''}</span></td>`;
+                } else if (col.type === 'genes') {
+                    const genes = (ct.markerGenes || []).map(gn => gn.name || '').filter(Boolean)
+                        .map(name => geneBases.has(name.toLowerCase()) ? `<strong>${name}</strong>` : name).join(', ');
+                    html += `<td class="align-genes${sel}">${genes}</td>`;
+                } else if (col.type === 'bool') {
+                    const val = ct.clusterAttributes && ct.clusterAttributes[col.key];
+                    html += `<td class="${sel.trim()}">${val ? '<span class="check-mark">✓</span>' : '<span class="dash-mark">—</span>'}</td>`;
+                } else if (col.type === 'temperature') {
+                    const temp = getAlignTemperature(ct);
+                    html += `<td class="align-temp${sel}">${temp || '<span class="dash-mark">—</span>'}</td>`;
+                } else if (col.type === 'soma') {
+                    html += `<td class="align-temp${sel}">${getClusterTableSoma(ct) || '<span class="dash-mark">—</span>'}</td>`;
+                } else {
+                    html += `<td class="${sel.trim()}">${ct[col.key] || '—'}</td>`;
+                }
+            });
+            html += '</tr>';
+        });
+    });
+    html += '</tbody>';
+    document.getElementById('clusterTable').innerHTML = html;
+    const allOpen = groups.every(clusterGroupIsExpanded);
+    document.getElementById('clusterTableExpandAll').textContent = allOpen ? 'Collapse all' : 'Expand all';
+}
+
+function toggleClusterTable(forceOpen) {
+    clusterTableOpen = forceOpen !== undefined ? forceOpen : !clusterTableOpen;
+    document.getElementById('clusterTableBody').hidden = !clusterTableOpen;
+    document.getElementById('clusterTableToggle').textContent = clusterTableOpen ? '▼ Hide table' : '▶ Show as table';
+    if (clusterTableOpen) {
+        renderClusterTable();
+    } else {
+        document.getElementById('clusterTableExpandAll').hidden = true;
+        document.getElementById('clusterTableExport').hidden = true;
+        document.getElementById('clusterTableCount').textContent = '';
+    }
+}
+
+function toggleClusterTableGroup(key) {
+    const g = getClusterTableGroups().find(x => x.key === key);
+    if (!g) return;
+    clusterTableExpanded[key] = !clusterGroupIsExpanded(g);
+    renderClusterTable();
+}
+
+function toggleClusterTableGroups() {
+    const groups = getClusterTableGroups();
+    const open = !groups.every(clusterGroupIsExpanded);
+    groups.forEach(g => { clusterTableExpanded[g.key] = open; });
+    renderClusterTable();
+}
+
+// Light tint of a hex color as an ExcelJS ARGB string
+function tintArgb(hex, amount) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    const mix = i => Math.round(parseInt(h.substr(i, 2), 16) * (1 - amount) + 255 * amount).toString(16).padStart(2, '0');
+    return ('FF' + mix(0) + mix(2) + mix(4)).toUpperCase();
+}
+
+function getClusterAttrLabel(a) {
+    if (a.startsWith('gene_')) { const gene = GENES.find(g => g.id === a); return gene ? gene.display : a.replace('gene_', ''); }
+    if (a.startsWith('source_')) return SOURCE_URLS && SOURCE_URLS[a] ? (CELL_TYPES.find(ct => ct.sourceNomenclature === SOURCE_URLS[a]) || {}).sourceNomenclatureLabel || a : a;
+    return ATTR_LABELS[a] || a;
+}
+
+async function exportClusterTableXlsx() {
+    if (typeof ExcelJS === 'undefined') {
+        alert('Excel export library not loaded. Please check your internet connection and reload the page.');
+        return;
+    }
+    if (!selectedAttributes.length) return;
+    try {
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Cluster table');
+        const COLUMNS = [
+            { header: 'Group', width: 26 },
+            { header: 'Shared', width: 9 },
+            { header: 'Cell Type', width: 28 },
+            { header: 'Preferred Label', width: 36 },
+            { header: 'Source', width: 26 },
+            { header: 'Marker Genes', width: 45 },
+            { header: 'Aβ', width: 6 }, { header: 'Aδ', width: 6 }, { header: 'C', width: 6 },
+            { header: 'LTM', width: 6 }, { header: 'HTM', width: 6 },
+            { header: 'Temp', width: 11 },
+            { header: 'Proprio', width: 8 }, { header: 'RA', width: 6 }, { header: 'SA', width: 6 },
+            { header: 'Species', width: 12 },
+            { header: 'Soma', width: 24 },
+            { header: 'Detail page', width: 16 },
+        ];
+        const numCols = COLUMNS.length;
+        const HEADER_ROW = 5;
+        const dataFont = { name: 'Arial', size: 10 };
+        const n = selectedAttributes.length;
+        const baseUrl = window.location.href.split('#')[0].split('?')[0];
+        const cellTypeLabel = { neuron: 'Neuron', cell: 'Non-neuronal', all: 'All cells' }[getClusterBaseClassFilter()] || getClusterBaseClassFilter();
+        const today = new Date().toISOString().split('T')[0];
+
+        ws.mergeCells(1, 1, 1, numCols);
+        ws.getCell('A1').value = 'NervoSensus — Cluster table';
+        ws.getCell('A1').font = { name: 'Arial', bold: true, size: 14, color: { argb: 'FF2D3748' } };
+        ws.getRow(1).height = 24;
+        ws.mergeCells(2, 1, 2, numCols);
+        ws.getCell('A2').value = `Grouped by: ${selectedAttributes.map(getClusterAttrLabel).join(', ')}  ·  Cell type: ${cellTypeLabel}  ·  Generated ${today}`;
+        ws.getCell('A2').font = { name: 'Arial', size: 10, color: { argb: 'FF718096' }, italic: true };
+        ws.mergeCells(3, 1, 3, numCols);
+        const viewUrl = buildClusterLinkURL(true);
+        ws.getCell('A3').value = { text: 'Open this view in NervoSensus', hyperlink: viewUrl };
+        ws.getCell('A3').font = { name: 'Arial', size: 10, underline: true, color: { argb: 'FF667EEA' } };
+        ws.getRow(4).height = 8;
+
+        const headerRow = ws.getRow(HEADER_ROW);
+        COLUMNS.forEach((col, ci) => {
+            const cell = headerRow.getCell(ci + 1);
+            cell.value = col.header;
+            cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF667EEA' } };
+            ws.getColumn(ci + 1).width = col.width;
+        });
+
+        const yes = v => v ? '✓' : '';
+        let r = HEADER_ROW + 1;
+        getClusterTableGroups().forEach(g => {
+            const groupLabel = getClusterLabel(g.key);
+            const fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tintArgb(getClusterColor(g.key), 0.7) } };
+            g.cells.forEach(node => {
+                const idx = node.idx !== undefined ? node.idx : CELL_TYPES.indexOf(node);
+                const ct = CELL_TYPES[idx];
+                const a = ct.clusterAttributes || {};
+                const row = ws.getRow(r++);
+                const values = [
+                    groupLabel, `${g.shared} of ${n}`,
+                    ct.localLabel || ct.preferredLabel || '', ct.preferredLabel || '',
+                    ct.sourceNomenclatureLabel || '', getMarkerGeneNames(ct),
+                    yes(a.fiber_a_beta), yes(a.fiber_a_delta), yes(a.fiber_c),
+                    yes(a.mechanosensitive_ltm), yes(a.mechanosensitive_htm),
+                    getAlignTemperature(ct),
+                    yes(a.proprioceptive), yes(a.rapidly_adapting), yes(a.slowly_adapting),
+                    ct.species || '', getClusterTableSoma(ct),
+                ];
+                values.forEach((v, ci) => { const c = row.getCell(ci + 1); c.value = v; c.font = dataFont; });
+                row.getCell(1).fill = fill;
+                for (let ci = 7; ci <= 15; ci++) { if (ci !== 12) row.getCell(ci).alignment = { horizontal: 'center' }; }
+                const link = row.getCell(numCols);
+                if (ct.id) {
+                    link.value = { text: ct.id, hyperlink: `${baseUrl}#cell/${ct.id}` };
+                    link.font = { ...dataFont, underline: true, color: { argb: 'FF667EEA' } };
+                }
+            });
+        });
+
+        ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: Math.max(HEADER_ROW, r - 1), column: numCols } };
+        ws.views = [{ state: 'frozen', xSplit: 3, ySplit: HEADER_ROW }];
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `NervoSensus_Cluster_Table_${today}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Export failed:', err);
+        alert('Export failed: ' + err.message);
+    }
 }
 
 
@@ -2920,10 +3206,23 @@ function copySynthesisLink() {
     copyPermalink(p);
 }
 
-function copyClusterLink() {
+function getClusterLinkParams(withTable) {
     const p = { view: 'cluster' };
     if (selectedAttributes.length) p.attrs = selectedAttributes.join('|');
-    copyPermalink(p);
+    const baseClass = getClusterBaseClassFilter();
+    if (baseClass !== 'neuron') p.cellType = baseClass;
+    if (withTable) p.table = '1';
+    return p;
+}
+
+function buildClusterLinkURL(withTable) {
+    const url = new URL(window.location.href.split('#')[0].split('?')[0]);
+    for (const [k, v] of Object.entries(getClusterLinkParams(withTable))) url.searchParams.set(k, v);
+    return url.toString();
+}
+
+function copyClusterLink() {
+    copyPermalink(getClusterLinkParams(clusterTableOpen));
 }
 
 function copyLineageLink() {
@@ -3801,6 +4100,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (needsRender) renderSynthesisView();
             }
             if (view === 'cluster') {
+                const cellTypeParam = params.get('cellType');
+                const cellTypeEl = document.getElementById('clusterBaseClassFilter');
+                if (cellTypeParam && cellTypeEl && [...cellTypeEl.options].some(o => o.value === cellTypeParam)) {
+                    cellTypeEl.value = cellTypeParam;
+                    onClusterBaseClassChange();
+                }
+                if (params.get('table') === '1') toggleClusterTable(true);
                 const attrsParam = params.get('attrs');
                 if (attrsParam) {
                     const attrs = attrsParam.split('|');

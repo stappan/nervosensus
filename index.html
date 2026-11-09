@@ -205,6 +205,7 @@
                                 <select id="clusterBaseClassFilter" class="filter-select" onchange="onClusterBaseClassChange()" style="width:100%;font-size:0.85rem;">
                                     <option value="neuron">Neuron</option>
                                     <option value="cell">Non-neuronal</option>
+                                    <option value="all">All cells</option>
                                 </select>
                             </div>
                         </div>
@@ -266,6 +267,20 @@
                     <div class="cluster-viz-area"><svg id="clusterSvg"></svg>
                         <div class="cluster-tooltip" id="clusterTooltip"></div>
                         <div class="cluster-instructions">Click nodes for details • Drag to reposition</div>
+                    </div>
+                </div>
+                <div class="cluster-table-section">
+                    <div class="align-controls">
+                        <button class="align-toggle-btn" id="clusterTableToggle" onclick="toggleClusterTable()">▶ Show as table</button>
+                        <button class="align-toggle-btn" id="clusterTableExpandAll" onclick="toggleClusterTableGroups()" hidden>Expand all</button>
+                        <button class="permalink-btn" id="clusterTableExport" onclick="exportClusterTableXlsx()" hidden>📊 Export .xlsx</button>
+                        <span class="align-count" id="clusterTableCount"></span>
+                    </div>
+                    <div id="clusterTableBody" hidden>
+                        <p class="cluster-table-prompt" id="clusterTablePrompt">Select attributes on the left to group cells into a table.</p>
+                        <div class="align-table-wrapper" id="clusterTableWrapper" hidden>
+                            <table class="align-table" id="clusterTable"></table>
+                        </div>
                     </div>
                 </div>
             </div>

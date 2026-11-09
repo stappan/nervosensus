@@ -329,6 +329,7 @@ def parse_npo_data(rows):
             'neurotransmitter': '',
             'somaLocation': '',
             'somaLocations': [],
+            'nerves': [],
             'sensoryTerminalLocations': [],
             'axonTerminalLocations': [],
             'sourceNomenclature': source_url,
@@ -352,6 +353,7 @@ def parse_npo_data(rows):
             'geneBaseNames': [],
             'alertNotes': [],
             'curatorNotes': [],
+            'reviewedBy': [],
             'sourceData': [],
             'localLabel': '',
             'subClassOf': [],
@@ -430,11 +432,17 @@ def parse_npo_data(rows):
                 if 'trigeminal' in val.lower():
                     ct['clusterAttributes']['soma_tg'] = True
 
-            elif npo == 'ilxtr:hasAxonSensoryTerminalLocatedIn' and val:
+            elif npo == 'ilxtr:hasAxonLocatedIn' and val:
+                if val not in ct['nerves']:
+                    ct['nerves'].append(val)
+
+            elif npo == 'ilxtr:hasAxonSensorySubcellularElementIn' and val:
                 if val not in ct['sensoryTerminalLocations']:
                     ct['sensoryTerminalLocations'].append(val)
 
-            elif npo == 'ilxtr:hasAxonTerminalLocatedIn' and val:
+            # Central terminations: axon terminals plus presynaptic elements
+            # (e.g. dorsal horn laminae) share the "Termination" row.
+            elif npo in ('ilxtr:hasAxonTerminalIn', 'ilxtr:hasAxonPresynapticElementIn') and val:
                 if val not in ct['axonTerminalLocations']:
                     ct['axonTerminalLocations'].append(val)
 
@@ -519,6 +527,11 @@ def parse_npo_data(rows):
 
             elif npo in ('ilxtr:curatorNote', 'curatorNote') and val:
                 ct['curatorNotes'].append(val)
+
+            elif npo == 'ilxtr:expertConsultant' and val:
+                reviewer = {'label': val, 'iri': iri}
+                if reviewer not in ct['reviewedBy']:
+                    ct['reviewedBy'].append(reviewer)
 
             elif npo == 'ilxtr:hasBiologicalSex' and val:
                 if val not in ct['biologicalSex']:

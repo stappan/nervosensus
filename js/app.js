@@ -274,7 +274,7 @@ function parseNPOData(rows) {
             entity: '', preferredLabel: '', species: 'unknown',
             circuitRole: 'sensory', neurotransmitter: '',
             somaLocation: '', somaLocations: [],
-            sensoryTerminalLocations: [], axonTerminalLocations: [],
+            nerves: [], sensoryTerminalLocations: [], axonTerminalLocations: [],
             sourceNomenclature: sourceUrl, sourceNomenclatureLabel: sourceLabel,
             sourceColor: sourceColor,
             markerGenes: [], geneExpressionString: '',
@@ -284,7 +284,7 @@ function parseNPOData(rows) {
             creLine: '', color: sourceColor,
             masterLabel: subclassMap[nid] || '',
             relatedCells: [], mapsTo: [], assertedSubclassOf: [], geneBaseNames: [],
-            alertNotes: [], curatorNotes: [], sourceData: [],
+            alertNotes: [], curatorNotes: [], reviewedBy: [], sourceData: [],
             clusterAttributes: {
                 cold_sensitive: false, heat_sensitive: false,
                 mechanosensitive_ltm: false, mechanosensitive_htm: false,
@@ -314,10 +314,13 @@ function parseNPOData(rows) {
                 if (val.toLowerCase().includes('dorsal root')) ct.clusterAttributes.soma_drg = true;
                 if (val.toLowerCase().includes('trigeminal')) ct.clusterAttributes.soma_tg = true;
             }
-            else if (npo === 'ilxtr:hasAxonSensoryTerminalLocatedIn' && val) {
+            else if (npo === 'ilxtr:hasAxonLocatedIn' && val) {
+                if (!ct.nerves.includes(val)) ct.nerves.push(val);
+            }
+            else if (npo === 'ilxtr:hasAxonSensorySubcellularElementIn' && val) {
                 if (!ct.sensoryTerminalLocations.includes(val)) ct.sensoryTerminalLocations.push(val);
             }
-            else if (npo === 'ilxtr:hasAxonTerminalLocatedIn' && val) {
+            else if ((npo === 'ilxtr:hasAxonTerminalIn' || npo === 'ilxtr:hasAxonPresynapticElementIn') && val) {
                 if (!ct.axonTerminalLocations.includes(val)) ct.axonTerminalLocations.push(val);
             }
             else if (npo === 'ilxtr:hasDriverExpressionConstitutivePhenotype') ct.creLine = val;
@@ -365,6 +368,9 @@ function parseNPOData(rows) {
             }
             else if (npo === 'curatorNote' && val) {
                 ct.curatorNotes.push(val);
+            }
+            else if (npo === 'ilxtr:expertConsultant' && val) {
+                if (!ct.reviewedBy.some(r => r.label === val && r.iri === iri)) ct.reviewedBy.push({ label: val, iri: iri || '' });
             }
             else if (npo === 'ilxtr:dataCitation' && (val || iri)) {
                 ct.sourceData.push({ label: val || iri, uri: iri || '' });
@@ -2759,9 +2765,10 @@ function buildCellDetailHTML(idx, useLinks) {
     if (ct.biologicalSex && ct.biologicalSex.length) subject += cdRow('Sex', ct.biologicalSex.join(', '), true);
     if (ct.observedAge) subject += cdRow('Observed at age', buildAgeHTML(ct.observedAge, idx), true);
     subject += buildSomaRowsHTML(ct);
+    if (ct.nerves && ct.nerves.length) subject += cdRow('Nerve', ct.nerves.join(', '));
+    if (ct.sensoryTerminalLocations && ct.sensoryTerminalLocations.length) subject += cdRow('Peripheral termination', ct.sensoryTerminalLocations.join(', '));
+    if (ct.axonTerminalLocations && ct.axonTerminalLocations.length) subject += cdRow('Termination', ct.axonTerminalLocations.join(', '));
     if (ct.subClassOf && ct.subClassOf.length) subject += cdRow('Subclass of', ct.subClassOf.join(', '));
-    if (ct.sensoryTerminalLocations && ct.sensoryTerminalLocations.length) subject += cdRow('Sensory terminal', ct.sensoryTerminalLocations.join(', '));
-    if (ct.axonTerminalLocations && ct.axonTerminalLocations.length) subject += cdRow('Axon terminal', ct.axonTerminalLocations.join(', '));
     if (ct.circuitRole) subject += cdRow('Circuit role', ct.circuitRole + (ct.neurotransmitter ? ', ' + ct.neurotransmitter : ''));
     if (ct.creLine) subject += cdRow('Cre line', ct.creLine);
 
@@ -2778,6 +2785,9 @@ function buildCellDetailHTML(idx, useLinks) {
 
     const alerts = (ct.alertNotes || []).map(n => `<p class="cd-alert">⚠ ${linkifyUrls(n)}</p>`).join('');
     const curator = (ct.curatorNotes || []).map(n => `<p>${linkifyUrls(n)}</p>`).join('');
+    const reviewers = (ct.reviewedBy || []).map(r => r.iri
+        ? `<p><a href="${r.iri}" target="_blank" rel="noopener">${r.label}</a> ↗</p>`
+        : `<p>${r.label}</p>`).join('');
 
     // In the modal there is no page header, so show the alias and source here.
     const modalMeta = useLinks ? '' :
@@ -2790,6 +2800,7 @@ function buildCellDetailHTML(idx, useLinks) {
         `</div>` +
         (phenotype ? `<section><div class="cd-sh">Phenotype</div><dl class="cd-dl">${phenotype}</dl></section>` : '') +
         (alerts ? `<section><div class="cd-sh">Alert notes</div><div class="cd-notes">${alerts}</div></section>` : '') +
+        (reviewers ? `<section><div class="cd-sh">Reviewed by</div><div class="cd-notes">${reviewers}</div></section>` : '') +
         (curator ? `<section><div class="cd-sh">Curator notes</div><div class="cd-notes">${curator}</div></section>` : '') +
     `</div>`;
 }

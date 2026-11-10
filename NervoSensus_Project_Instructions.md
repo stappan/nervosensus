@@ -2,32 +2,33 @@
 
 ## What is NervoSensus?
 
-NervoSensus is a client-side web application for visualizing 153 somatosensory cell types (143 neurons + 10 non-neuronal) from 6 published sources. It runs entirely client-side with no server, build step, or external APIs.
+NervoSensus is a client-side web application for visualizing 179 somatosensory cell types (151 neurons + 28 non-neuronal) from 7 published sources. It runs entirely client-side with no server, build step, or external APIs.
 
 ## Architecture
 
 - **Multi-file structure**: `index.html` (markup), `js/app.js` (logic), `js/data.js` (generated data), `css/styles.css` (styles)
 - **Data pipeline**: `sync_data.py` reads source XLSX and generates `js/data.js`
-- **CDN dependencies**: D3.js v7.8.5 (cluster/lineage views), PapaParse v5.4.1 (CSV), SheetJS v0.18.5 (Excel upload)
-- **Embedded data**: `DATA_VERSION` (auto-generated version/date/counts), `DEFAULT_CELL_TYPES` (153 cells), `DEFAULT_SOURCES` (6 sources as object keyed by DOI), `DEFAULT_FAMILIES` (18 family groupings), `DEFAULT_GENES` (95 genes)
+- **CDN dependencies**: D3.js v7.8.5 (cluster/lineage views), PapaParse v5.4.1 (CSV), SheetJS v0.18.5 (Excel upload), ExcelJS v4.4.0 (`.xlsx` exports), docx v8.5.0 (`.docx` exports)
+- **Embedded data**: `DATA_VERSION` (auto-generated version/date/counts), `DEFAULT_CELL_TYPES` (179 cells), `DEFAULT_SOURCES` (7 sources as object keyed by DOI), `DEFAULT_FAMILIES` (18 family groupings), `DEFAULT_GENES` (223 genes)
 - **No build step**: Open index.html directly in any modern browser
 
 ## Data Model
 
-### Sources (6 publications)
+### Sources (7 publications)
 
 | Source | Variable label | Cells | Color | DOI |
 |--------|---------------|------:|-------|-----|
 | Bhuiyan et al., 2024 | `Bhuiyan et al., 2024` | 54 | `#667eea` | 10.1126/sciadv.adj9173 |
-| Bhuiyan et al., 2025 | `Bhuiyan et al., 2025` | 32 | `#f59e0b` | https://www.biorxiv.org/content/10.1101/2025.11.05.686654v1 |
+| Bhuiyan et al., 2025 | `Bhuiyan et al., 2025` | 32 (22 neurons + 10 non-neuronal) | `#f59e0b` | https://www.biorxiv.org/content/10.1101/2025.11.05.686654v1 |
 | Krauter et al., 2025 | `Krauter et al., 2025` | 22 | `#8b5cf6` | 10.1038/s42003-025-08315-1 |
 | Qi et al., 2024 | `Qi et al., 2024` | 17 | `#06b6d4` | 10.1016/j.cell.2024.02.006 |
-| Yu et al., 2024 | `Yu et al., 2024` | 16 | `#ef4444` | 10.1038/s41593-024-01794-1 |
+| Yu et al., 2024 | `Yu et al., 2024` | 23 | `#ef4444` | 10.1038/s41593-024-01794-1 |
 | Tavares-Ferreira et al., 2022 | `Tavares-Ferreira et al., 2022` | 12 | `#22c55e` | 10.1126/scitranslmed.abj8186 |
+| Boyer et al., 2026 | `Boyer et al., 2026` | 19 (1 neuron + 18 non-neuronal) | `#ec4899` | 10.1101/2025.09.21.677655 |
 
 ### Cell type fields
 
-Each cell in `DEFAULT_CELL_TYPES` has: `id` (npokb CURIE), `baseClass` ("neuron" or "cell"), `preferredLabel`, `entity`, `species` (mouse/human/macaque/guinea pig), `somaLocation`, `somaLocations[]`, `biologicalSex[]`, `observedAge{values, count, other, min, max}` (from `ilxtr:observedAtAgeInYears`), `spinalRegions[{region, segments}]` + `spinalRegionsOf` (DRG cells only; all four regions always present), `sourceNomenclatureLabel`, `sourceNomenclature` (DOI), `sourceColor`, `sourceData`, `color`, `circuitRole`, `neurotransmitter`, `creLine`, `geneExpressionString`, `geneBaseNames[]`, `markerGenes[]` (with URIs, `expressionLevel`, `determinedBy`), `fiberTypeString`, `fiberTypeStringAbbrev`, `fiberTypeMethods[]`, `physiologyString`, `physiologyStringAbbrev`, `physiologyMethods[]`, `relatedCells[]` (by npokb ID), `assertedSubclassOf[]` (by npokb ID), `mapsTo[]` (by npokb ID), `proposedEquivalences[]` (idx-based), `clusterAttributes{}`, `alertNotes`, `curatorNotes`, `masterLabel`.
+Each cell in `DEFAULT_CELL_TYPES` has: `id` (npokb CURIE), `baseClass` ("neuron" or "cell"), `preferredLabel`, `entity`, `species` (mouse/human/macaque/guinea pig), `somaLocation`, `somaLocations[]`, `biologicalSex[]`, `observedAge{values, count, other, min, max}` (from `ilxtr:observedAtAgeInYears`), `spinalRegions[{region, segments}]` + `spinalRegionsOf` (DRG cells only; all four regions always present), `nerves[]` (`ilxtr:hasAxonLocatedIn`), `sensoryTerminalLocations[]` (`ilxtr:hasAxonSensorySubcellularElementIn`), `axonTerminalLocations[]` (`ilxtr:hasAxonTerminalIn` + `ilxtr:hasAxonPresynapticElementIn`), `reviewedBy[{label, iri}]` (`ilxtr:expertConsultant`, ORCID IRI), `sourceNomenclatureLabel`, `sourceNomenclature` (DOI), `sourceColor`, `sourceData`, `color`, `circuitRole`, `neurotransmitter`, `creLine`, `geneExpressionString`, `geneBaseNames[]`, `markerGenes[]` (with URIs, `expressionLevel`, `determinedBy`), `fiberTypeString`, `fiberTypeStringAbbrev`, `fiberTypeMethods[]`, `physiologyString`, `physiologyStringAbbrev`, `physiologyMethods[]`, `relatedCells[]` (by npokb ID), `assertedSubclassOf[]` (by npokb ID), `mapsTo[]` (by npokb ID), `proposedEquivalences[]` (idx-based), `clusterAttributes{}`, `alertNotes`, `curatorNotes`, `masterLabel`.
 
 ### Families (18 groups)
 
@@ -45,20 +46,24 @@ Each cell in `DEFAULT_CELL_TYPES` has: `id` (npokb CURIE), `baseClass` ("neuron"
 ### Relationship topology
 
 ```
-Master Families (18) ← Bhuiyan 2024 Variants (54) ← Bhuiyan 2025 neurons ← Other Sources (67)
+Master Families (18) ← Bhuiyan 2024 Variants (54) ← Bhuiyan 2025 neurons ← Other Sources (74)
+                                                                              ├── Yu (23)
                                                                               ├── Krauter (22)
                                                                               ├── Qi (17)
-                                                                              ├── Yu (16)
                                                                               └── Tavares-Ferreira (12)
+
+Boyer et al., 2026 (19) has no asserted relationships yet and is not part of this topology.
 ```
 
-## Views (7)
+## Views (8)
 
 ### 1. Card View (`cards`)
 - Responsive grid of expandable cards, color-coded by source
 - Filter bar: source, species, soma location, circuit role, text search
 - Click opens detail modal with full data, gene links, relationship buttons
 - Detail modal includes base-class badge, determinedByMethod badges, expression level badges
+- "Studied in" rows after soma location: Nerve, Peripheral termination, Termination (each shown only when present)
+- "Reviewed by" section above Curator notes: each reviewer name links to its ORCID IRI in a new tab
 
 ### 2. Tree View (`tree`)
 - Hierarchical grouping: by location or by axon type
@@ -71,10 +76,13 @@ Master Families (18) ← Bhuiyan 2024 Variants (54) ← Bhuiyan 2025 neurons ←
 - Group-by options, sortable columns, equivalence pin-highlighting
 
 ### 4. Cluster View (`cluster`)
-- D3 force-directed simulation with Cell Type filter dropdown (neuron / non-neuronal)
-- 6 attribute filter categories (threshold, adaptation, axon, species, soma, source, marker genes)
+- D3 force-directed simulation with Cell Type filter dropdown (Neuron default / Non-neuronal / All cells)
+- Attribute filter categories: threshold, adaptation, axon, species, soma, source, marker genes
 - Multi-attribute intersection highlighting (gold glow)
 - Dynamic legend and statistics
+- **Cluster table** ("▶ Show as table" under the plot): Align-style table grouped by `getClusterKey()`, ordered by number of shared attributes (desc), then group size; group headers show plot color, shared count, cell count, per-source counts; collapsible groups (None starts collapsed); Marker Genes as a comma list with selected genes bolded; selected-attribute columns highlighted; extra Soma column
+- **Export .xlsx** (`exportClusterTableXlsx()`, ExcelJS): one sheet with selection summary, link back to the view, Group + Shared columns, tinted Group cells, frozen header, autofilter, last column = detail-page link (`<page URL>#cell/<npokb ID>`)
+- Copy Link params: `attrs` (pipe-separated), `cellType` (`cell` or `all`; omitted for neuron), `table=1` when the table is open
 
 ### 5. Provisional Mapping / Lineage View (`lineage`)
 - 4-column SVG: Master Cells → Bhuiyan 2024 Variants → Bhuiyan 2025 → Other Sources
@@ -84,13 +92,17 @@ Master Families (18) ← Bhuiyan 2024 Variants (54) ← Bhuiyan 2025 neurons ←
 - Line types: solid purple = asserted subtype, red double line = asserted equivalence, solid blue = family membership
 - Unlinked Bhuiyan 2025 cells in separate sub-groups at bottom
 
-### 6. Concordance View (`concordance`)
-- Cross-source alignment table with Bhuiyan 2025 parent rows and expandable related cells
-- Property checkmarks by source
-- Export to `.xlsx` and `.docx`
+### 6. Compare View (`compare`)
+- Compares cell types across sources against a chosen anchor source
+- Shows only relationships the anchor paper's authors identified
 
 ### 7. Align View (`align`)
-- Side-by-side cross-source cell type comparison
+- Cross-source alignment table with Bhuiyan 2025 parent rows and expandable related cells
+- Property checkmarks by source
+- Export `.xlsx` (`exportSourceReviewXlsx()`: Source Review workbook, one sheet per source) and `.docx` (`exportAlignDocx()`)
+
+### 8. Concordance View (`concordance`)
+- Rows anchored by a selected source; columns show each other source's local label for the corresponding cell type
 - Export to `.docx`
 
 ## Key functions
@@ -98,7 +110,8 @@ Master Families (18) ← Bhuiyan 2024 Variants (54) ← Bhuiyan 2025 neurons ←
 - `renderCardView()` — card grid with filtering
 - `renderTreeView()` — hierarchical tree with non-neuronal section
 - `renderSynthesisView()` — matrix table
-- `renderClusterView()` / `updateClusterVisualization()` — force simulation (neurons only)
+- `initClusterView()` / `updateClusterVisualization()` — force simulation, filtered by the Cell Type dropdown
+- `renderClusterTable()` / `exportClusterTableXlsx()` — cluster table under the plot and its `.xlsx` export
 - `renderLineageView()` — 4-column SVG with barycenter layout (neurons only)
 - `showModal(idx)` — detail modal for any cell
 - `openCellById(id)` — navigate to cell by npokb CURIE (used by relationship buttons)
@@ -107,14 +120,15 @@ Master Families (18) ← Bhuiyan 2024 Variants (54) ← Bhuiyan 2025 neurons ←
 - `updateVersionInfo()` — displays app and data version in header
 - `getAxonGroup(ct)` — shared fiber type classification (Aβ / Aδ / A fiber / C fiber / Other)
 - `onClusterBaseClassChange()` — handles Cell Type filter toggle in cluster view
+- `getClusterLinkParams()` / `buildClusterLinkURL()` — cluster permalink (attributes, cell type, table state)
 
 ## Working with the codebase
 
 When editing, keep in mind:
 - `js/data.js` is generated by `sync_data.py` — do not edit it manually; fix data in the source XLSX and regenerate
-- Source color mappings exist in multiple places: `sourceColors` objects in renderLineageView and renderClusterView, the cluster legend HTML, and lineage legend HTML. (The cluster Source filter buttons, `SOURCE_URLS` and their `ATTR_LABELS`/`ATTR_SHORT` entries are built from `DEFAULT_SOURCES` by `initSourceButtons()`.)
+- Source names and colors are hard-coded in the Provisional Mapping view: `sourceColors` and `col3Sources` in `renderLineageView()` and the lineage legend in `index.html`. Boyer et al., 2026 is not in these yet. (The cluster Source filter buttons, `SOURCE_URLS` and their `ATTR_LABELS`/`ATTR_SHORT` entries are built from `DEFAULT_SOURCES` by `initSourceButtons()`.)
 - When adding a new source, ALL of these locations must be updated
-- Source XLSX: `forNervoSensus2extended.xlsx` (in main repo directory; sheet "PNS Cells to NPO"). Full sheet ingested.
+- Source XLSX: `forNervoSensus.xlsx` (in main repo directory; sheet `forNervoSensus`). Full sheet ingested; 179 cells.
 - To regenerate data: `python sync_data.py path/to/file.xlsx` (requires openpyxl; `--max-row N` limits to sheet rows 2..N)
 - `SPINAL_REGIONS_BY_SOMA` in `sync_data.py` maps UBERON DRG segment IRIs to regions (verified against OLS); extend it if another ganglion gains segment data
 

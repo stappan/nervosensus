@@ -41,8 +41,8 @@ Every cell type has a stable npokb CURIE identifier (e.g., `npokb:915`). All cro
 
 Cell types are linked across sources through two relationship types:
 
-- **Asserted subtype** (`assertedSubclassOf`): A cell is declared a subtype of another (e.g., a big DRG paper cell is a subtype of a CSA species variant). Rendered as a solid purple line.
-- **Asserted equivalence** (`mapsTo`): A cell is declared equivalent to another across nomenclatures (e.g., a big DRG paper cell maps to a Krauter cell). Rendered as a red double line.
+- **Asserted subtype** (`assertedSubclassOf`): A cell is declared a subtype of another (e.g., a Bhuiyan et al., 2025 cell is a subtype of a Bhuiyan et al., 2024 species variant). Rendered as a solid purple line.
+- **Asserted equivalence** (`mapsTo`): A cell is declared equivalent to another across nomenclatures (e.g., a Bhuiyan et al., 2025 cell maps to a Krauter cell). Rendered as a red double line.
 
 ### Per-cell data fields
 

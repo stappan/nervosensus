@@ -20,8 +20,8 @@ from openpyxl.formatting.rule import CellIsRule
 
 # ── Configuration ───────────────────────────────────────────────────
 SOURCE_SHORT = {
-    'big DRG paper': 'Big DRG',
-    'CSA paper': 'CSA',
+    'Bhuiyan et al., 2025': 'Bhuiyan 2025',
+    'Bhuiyan et al., 2024': 'Bhuiyan 2024',
     'Krauter et al., 2025': 'Krauter 2025',
     'Qi et al., 2024': 'Qi 2024',
     'Yu et al., 2024': 'Yu 2024',

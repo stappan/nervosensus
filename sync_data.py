@@ -10,12 +10,22 @@ Usage:
     python sync_data.py                     # auto-finds .xlsx in project dir
     python sync_data.py path/to/file.xlsx   # specify a file
     python sync_data.py file.xlsx --max-row 3612   # ingest only up to sheet row 3612
+
+Predicate -> field mapping is read from js/predicates.js (PREDICATE_MAP), the same
+map js/app.js uses for spreadsheet upload; the field logic below dispatches on the
+mapped field, not the predicate string, so a predicate rename is a one-line change
+there. Every ingested row (not "don't add", has a value or IRI) is also kept on its
+cell as `properties` (predicate, Relation Type, value, IRI, union, nest, Modifier,
+determinedByMethod); predicates with no mapping are reported at the end of a run
+and shown in the app's detail view under "Additional properties".
 """
 
 import json
 import os
+import re
 import sys
 import glob
+from collections import Counter
 from datetime import date
 
 try:
@@ -29,15 +39,38 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
+# Assigned to sources in the order they first appear in the sheet.
 SOURCE_COLORS = [
-    '#667eea',  # CSA paper
-    '#f59e0b',  # big DRG paper
-    '#22c55e',  # Tavares-Ferreira
-    '#ef4444',  # Yu et al.
-    '#8b5cf6',  # Krauter et al.
-    '#06b6d4',  # Qi et al.
-    '#ec4899',  # Kupari et al.
+    '#667eea',
+    '#f59e0b',
+    '#22c55e',
+    '#ef4444',
+    '#8b5cf6',
+    '#06b6d4',
+    '#ec4899',
 ]
+
+PREDICATES_JS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'js', 'predicates.js')
+
+
+def load_shared_json(name, path=PREDICATES_JS):
+    """Read a JSON block (PREDICATE_MAP, ATTRIBUTE_BY_IRI) from js/predicates.js (shared with js/app.js)."""
+    with open(path, encoding='utf-8') as f:
+        content = f.read()
+    m = re.search(r'/\*BEGIN_' + name + r'\*/(.*?)/\*END_' + name + r'\*/', content, re.S)
+    if not m:
+        print(f"ERROR: {name} markers not found in {path}")
+        sys.exit(1)
+    return json.loads(m.group(1))
+
+
+PREDICATE_MAP = load_shared_json('PREDICATE_MAP')
+ATTRIBUTE_BY_IRI = load_shared_json('ATTRIBUTE_BY_IRI')
+
+
+def predicate_field(predicate):
+    entry = PREDICATE_MAP.get(predicate)
+    return entry['field'] if entry else None
 
 
 # Spinal regions of the dorsal root ganglion and their segment-level ganglia,
@@ -121,6 +154,7 @@ CANONICAL_HEADERS = {
     'union set number': 'Union set number',
     'nest intersection number': 'Nest intersection number',
     'npokb id': 'npokb ID',
+    'relation type': 'Relation Type',
     'proposed action': 'Proposed action',
     'modifier': 'Modifier',
     'determinedbymethod': 'determinedByMethod',
@@ -165,6 +199,18 @@ def read_excel(path, max_row=None):
 # Main parsing logic — mirrors parseNPOData() in js/app.js lines 116-367
 # ---------------------------------------------------------------------------
 
+def build_property(p):
+    """One source row as stored on the cell's `properties` list; empty fields omitted."""
+    out = {'predicate': p['npo']}
+    for key, src in (('relation', 'relation'), ('value', 'value'), ('iri', 'iri'),
+                     ('union', 'union'), ('nest', 'nest'), ('modifier', 'modifier'),
+                     ('method', 'determinedBy')):
+        v = safe_str(p.get(src))
+        if v:
+            out[key] = v
+    return out
+
+
 def parse_npo_data(rows):
     """
     Replicate the JavaScript parseNPOData() function.
@@ -183,9 +229,13 @@ def parse_npo_data(rows):
     for row_num, row in enumerate(rows, start=2):
         neuron_id = safe_str(row.get('Neuron ID'))
         npo_prop = safe_str(row.get('NPO Property'))
+        relation = safe_str(row.get('Relation Type'))
         value_label = row.get('Property Value Label')
         value_iri = row.get('NPO Property Value IRI')
-        union_num = row.get('Union set number') or row.get('')
+        # `is None` check, not `or`: union set 0 is a real value.
+        union_num = row.get('Union set number')
+        if union_num is None:
+            union_num = row.get('')
         nest_num = row.get('Nest intersection number')
         npokb_id = safe_str(row.get('npokb ID'))
         proposed_action = safe_str(row.get('Proposed action'))
@@ -221,12 +271,16 @@ def parse_npo_data(rows):
         if neuron_id not in neurons:
             neurons[neuron_id] = []
 
+        field = predicate_field(npo_prop)
+
         # Detect baseClass from NPO Property rows
-        if npo_prop == 'ilxtr:neurondmBaseClass' and val:
+        if field == 'baseClass' and val:
             neuron_base_class[neuron_id] = val.lower()
 
         neurons[neuron_id].append({
             'npo': npo_prop,
+            'field': field,
+            'relation': relation,
             'union': union_num,
             'nest': nest_num,
             'value': val,
@@ -250,7 +304,7 @@ def parse_npo_data(rows):
     for nid, props in neurons.items():
         npokb_id = neuron_npokb.get(nid, '')
         for p in props:
-            if p['npo'] == 'rdfs:label' and p['value'] and npokb_id:
+            if p['field'] == 'entity' and p['value'] and npokb_id:
                 entity_to_npokb[p['value']] = npokb_id
 
     # ------------------------------------------------------------------
@@ -267,7 +321,7 @@ def parse_npo_data(rows):
             master_npokb_ids.add(npokb_id)
         pref = ''
         for p in props:
-            if p['npo'] == 'skos:prefLabel':
+            if p['field'] == 'preferredLabel':
                 pref = p['value']
         if pref and npokb_id:
             master_npokb_to_pref[npokb_id] = pref
@@ -281,7 +335,7 @@ def parse_npo_data(rows):
         if 'master' in nid.lower():
             continue
         for p in props:
-            if p['npo'] == 'ilxtr:literatureCitation' and p['iri']:
+            if p['field'] == 'sourceNomenclature' and p['iri']:
                 if p['iri'] not in sources:
                     sources[p['iri']] = {'label': p['value'] or p['iri'], 'cells': []}
                 if nid not in sources[p['iri']]['cells']:
@@ -310,7 +364,7 @@ def parse_npo_data(rows):
         source_url = ''
         source_label = ''
         for p in props:
-            if p['npo'] == 'ilxtr:literatureCitation' and p['iri']:
+            if p['field'] == 'sourceNomenclature' and p['iri']:
                 source_url = p['iri']
                 source_label = p['value'] or p['iri']
 
@@ -358,6 +412,8 @@ def parse_npo_data(rows):
             'localLabel': '',
             'subClassOf': [],
             'biologicalSex': [],
+            # Every ingested source row for this cell, mapped or not (see js/predicates.js).
+            'properties': [build_property(p) for p in props if p['value'] or p['iri']],
             'clusterAttributes': {
                 'cold_sensitive': False,
                 'heat_sensitive': False,
@@ -389,20 +445,24 @@ def parse_npo_data(rows):
         species_seen = []
 
         for p in props:
-            npo = p['npo']
+            f = p['field']
             val = p['value']
             iri = p['iri']
+            if not val and not iri:
+                continue  # blank template row (no value, no IRI)
+            if iri in ATTRIBUTE_BY_IRI:
+                ct['clusterAttributes'][ATTRIBUTE_BY_IRI[iri]] = True
 
-            if npo == 'rdfs:label':
+            if f == 'entity':
                 ct['entity'] = val
 
-            elif npo == 'skos:prefLabel':
+            elif f == 'preferredLabel':
                 ct['preferredLabel'] = val
 
-            elif npo == 'ilxtr:localLabel':
+            elif f == 'localLabel':
                 ct['localLabel'] = val
 
-            elif npo == 'ilxtr:hasInstanceInTaxon':
+            elif f == 'species':
                 if val.lower() not in species_seen:
                     species_seen.append(val.lower())
                 ct['species'] = val.lower()
@@ -410,18 +470,18 @@ def parse_npo_data(rows):
                 if sp_key in ct['clusterAttributes']:
                     ct['clusterAttributes'][sp_key] = True
 
-            elif npo == 'ilxtr:hasCircuitRolePhenotype':
+            elif f == 'circuitRole':
                 ct['circuitRole'] = val
 
-            elif npo == 'ilxtr:hasNeurotransmitterPhenotype':
+            elif f == 'neurotransmitter':
                 ct['neurotransmitter'] = val.strip()
 
-            elif npo == 'ilxtr:hasSomaLocatedIn' and iri in SPINAL_SEGMENTS:
+            elif f == 'somaLocations' and iri in SPINAL_SEGMENTS:
                 # Segment-level ganglion: kept out of somaLocations so tree/cluster
                 # grouping is unchanged; shown under its region on the detail page.
                 segment_rows.append(iri)
 
-            elif npo == 'ilxtr:hasSomaLocatedIn' and val:
+            elif f == 'somaLocations' and val:
                 if iri and iri not in soma_iris:
                     soma_iris.append(iri)
                     soma_label_by_iri[iri] = val
@@ -432,29 +492,28 @@ def parse_npo_data(rows):
                 if 'trigeminal' in val.lower():
                     ct['clusterAttributes']['soma_tg'] = True
 
-            elif npo == 'ilxtr:hasAxonLocatedIn' and val:
+            elif f == 'nerves' and val:
                 if val not in ct['nerves']:
                     ct['nerves'].append(val)
 
-            elif npo == 'ilxtr:hasAxonSensorySubcellularElementIn' and val:
+            elif f == 'sensoryTerminalLocations' and val:
                 if val not in ct['sensoryTerminalLocations']:
                     ct['sensoryTerminalLocations'].append(val)
 
             # Central terminations: axon terminals plus presynaptic elements
             # (e.g. dorsal horn laminae) share the "Termination" row.
-            elif npo in ('ilxtr:hasAxonTerminalIn', 'ilxtr:hasAxonPresynapticElementIn') and val:
+            elif f == 'axonTerminalLocations' and val:
                 if val not in ct['axonTerminalLocations']:
                     ct['axonTerminalLocations'].append(val)
 
-            elif npo == 'ilxtr:hasDriverExpressionConstitutivePhenotype':
+            elif f == 'creLine':
                 ct['creLine'] = val
 
-            elif npo in ('TEMP:mapsTo', 'ilxtr:mapsTo'):
+            elif f == 'mapsTo':
                 target_id = iri if iri.startswith('npokb:') else entity_to_npokb.get(val, '')
                 ct['mapsTo'].append({'label': val, 'iri': iri, 'id': target_id})
 
-            elif npo in ('ilxtr:hasExpressionPhenotype',
-                         'ilxtr:hasNucleicAcidExpressionPhenotype') and val:
+            elif f == 'markerGenes' and val:
                 parts = val.split(' ', 1)
                 nm = parts[0]
                 exp = parts[1] if len(parts) > 1 else ''
@@ -463,7 +522,7 @@ def parse_npo_data(rows):
                 gene_entry = {'name': nm, 'uri': iri or '', 'expression': exp}
                 if p['determinedBy']:
                     gene_entry['determinedBy'] = p['determinedBy']
-                if npo == 'ilxtr:hasNucleicAcidExpressionPhenotype' and p['modifier']:
+                if p['npo'] == 'ilxtr:hasNucleicAcidExpressionPhenotype' and p['modifier']:
                     gene_entry['expressionLevel'] = p['modifier']
                 ct['markerGenes'].append(gene_entry)
                 base = nm.lower()
@@ -473,21 +532,14 @@ def parse_npo_data(rows):
                     gene_map[base] = {'display': nm, 'cells': []}
                 gene_map[base]['cells'].append(ct['preferredLabel'])
 
-            elif npo == 'ilxtr:hasAxonPhenotype' and val:
+            elif f == 'axonPhenotype' and val:
                 item = {'union': p['union'], 'nest': p['nest'], 'display': val}
                 if p['determinedBy']:
                     item['determinedBy'] = p['determinedBy']
                 axon_items.append(item)
-                vl = val.lower()
-                if 'beta' in vl or '(beta)' in vl or 'β' in vl:
-                    ct['clusterAttributes']['fiber_a_beta'] = True
-                if 'delta' in vl or '(delta)' in vl or 'δ' in vl:
-                    ct['clusterAttributes']['fiber_a_delta'] = True
-                if 'type c' in vl:
-                    ct['clusterAttributes']['fiber_c'] = True
+                # Fiber-type flags come from the value IRI (ATTRIBUTE_BY_IRI), not label text.
 
-            elif npo in ('ilxtr:hasThresholdPhenotype',
-                         'ilxtr:hasPredictedThresholdPhenotype') and val:
+            elif f == 'thresholdPhenotype' and val:
                 item = {'union': p['union'], 'nest': p['nest'], 'display': val}
                 if p['determinedBy']:
                     item['determinedBy'] = p['determinedBy']
@@ -498,7 +550,7 @@ def parse_npo_data(rows):
                 if 'htm' in vl or 'high-threshold' in vl:
                     ct['clusterAttributes']['mechanosensitive_htm'] = True
 
-            elif npo == 'ilxtr:hasAdaptationPhenotype' and val:
+            elif f == 'adaptationPhenotype' and val:
                 item = {'union': p['union'], 'nest': p['nest'], 'display': val}
                 if p['determinedBy']:
                     item['determinedBy'] = p['determinedBy']
@@ -509,7 +561,7 @@ def parse_npo_data(rows):
                 if 'slowly' in vl or 'sa1' in vl:
                     ct['clusterAttributes']['slowly_adapting'] = True
 
-            elif npo == 'ilxtr:hasFunctionalPhenotype' and val:
+            elif f == 'functionalPhenotype' and val:
                 item = {'union': p['union'], 'nest': p['nest'], 'display': val}
                 if p['determinedBy']:
                     item['determinedBy'] = p['determinedBy']
@@ -522,35 +574,35 @@ def parse_npo_data(rows):
                 if 'proprioceptive' in vl:
                     ct['clusterAttributes']['proprioceptive'] = True
 
-            elif npo in ('ilxtr:alertNote', 'alertNote') and val:
+            elif f == 'alertNotes' and val:
                 ct['alertNotes'].append(val)
 
-            elif npo in ('ilxtr:curatorNote', 'curatorNote') and val:
+            elif f == 'curatorNotes' and val:
                 ct['curatorNotes'].append(val)
 
-            elif npo == 'ilxtr:expertConsultant' and val:
+            elif f == 'reviewedBy' and val:
                 reviewer = {'label': val, 'iri': iri}
                 if reviewer not in ct['reviewedBy']:
                     ct['reviewedBy'].append(reviewer)
 
-            elif npo == 'ilxtr:hasBiologicalSex' and val:
+            elif f == 'biologicalSex' and val:
                 if val not in ct['biologicalSex']:
                     ct['biologicalSex'].append(val)
 
-            elif npo == 'ilxtr:observedAtAgeInYears' and val:
+            elif f == 'observedAge' and val:
                 if 'observedAge' in ct:
                     warnings.append(f"{ct['id']}: more than one ilxtr:observedAtAgeInYears row; using the first")
                 else:
                     ct['observedAge'] = summarize_ages(val)
 
-            elif npo == 'ilxtr:dataCitation' and (val or iri):
+            elif f == 'sourceData' and (val or iri):
                 ct['sourceData'].append({'label': val or iri, 'uri': iri or ''})
 
-            elif npo in ('TEMP:subClassOf', 'TEMP:assertedSubClassOf'):
+            elif f == 'assertedSubclassOf':
                 target_id = iri if iri.startswith('npokb:') else entity_to_npokb.get(val, '')
                 ct['assertedSubclassOf'].append({'label': val, 'iri': iri, 'id': target_id})
 
-            elif npo == 'ilxtr:subClassOf' and val:
+            elif f == 'subClassOf' and val:
                 if val not in ct['subClassOf']:
                     ct['subClassOf'].append(val)
 
@@ -676,7 +728,7 @@ def parse_npo_data(rows):
             continue
         pref_label = ''
         for p in props:
-            if p['npo'] == 'skos:prefLabel':
+            if p['field'] == 'preferredLabel':
                 pref_label = p['value']
         if not pref_label:
             continue
@@ -772,6 +824,16 @@ def main():
     print(f"  Rows read: {len(rows)}")
 
     families, cell_types, genes, source_color_map = parse_npo_data(rows)
+
+    # Predicates kept in `properties` but not mapped to any app field. They show in
+    # the detail view under "Additional properties"; add them to js/predicates.js
+    # if they should feed a field.
+    unmapped = Counter(p['predicate'] for ct in cell_types for p in ct['properties']
+                       if p['predicate'] not in PREDICATE_MAP)
+    if unmapped:
+        print(f"\n  Predicates with no field mapping in js/predicates.js ({len(unmapped)}), kept as additional properties:")
+        for pred, n in sorted(unmapped.items()):
+            print(f"    {pred or '(blank NPO Property)'}: {n} rows")
 
     # Summary
     neuron_count = sum(1 for ct in cell_types if ct.get('baseClass', 'neuron') == 'neuron')

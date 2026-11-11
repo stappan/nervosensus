@@ -73,7 +73,7 @@ def bool_mark(ct, key):
     return '✓' if (ct.get('clusterAttributes') or {}).get(key) else '—'
 
 # ── Build align data ─────────────────────────────────────────────────
-big_drg = [(idx, ct) for idx, ct in enumerate(cells) if ct.get('sourceNomenclatureLabel') == 'big DRG paper']
+big_drg = [(idx, ct) for idx, ct in enumerate(cells) if ct.get('sourceNomenclatureLabel') == 'Bhuiyan et al., 2025']
 
 parent_rows = []
 for parent_idx, parent_ct in big_drg:
@@ -81,7 +81,7 @@ for parent_idx, parent_ct in big_drg:
     children = []
     seen = set()
     for ri in rel_idxs:
-        if ri != parent_idx and cells[ri].get('sourceNomenclatureLabel') != 'big DRG paper' and ri not in seen:
+        if ri != parent_idx and cells[ri].get('sourceNomenclatureLabel') != 'Bhuiyan et al., 2025' and ri not in seen:
             children.append((ri, cells[ri]))
             seen.add(ri)
     children.sort(key=lambda x: x[1].get('sourceNomenclatureLabel', ''))
@@ -149,7 +149,7 @@ title_run.font.color.rgb = RGBColor(0x2d, 0x37, 0x48)
 
 # Subtitle
 sub_para = doc.add_paragraph()
-sub_run = sub_para.add_run('Big DRG paper cell types with related cells from other sources. ')
+sub_run = sub_para.add_run('Bhuiyan et al., 2025 cell types with related cells from other sources. ')
 sub_run.font.size = Pt(9)
 sub_run.font.color.rgb = RGBColor(0x71, 0x80, 0x96)
 sub_run2 = sub_para.add_run(f'{len(big_drg)} parent cells · {sum(len(ch) for _, _, ch in sorted_rows)} related cells')
@@ -384,6 +384,6 @@ out_path = 'NervoSensus_Align.docx'
 doc.save(out_path)
 total_children = sum(len(ch) for _, _, ch in sorted_rows)
 print(f'Saved {out_path}')
-print(f'  {len(big_drg)} Big DRG parent cells')
+print(f'  {len(big_drg)} Bhuiyan et al., 2025 parent cells')
 print(f'  {total_children} related child cells')
 print(f'  {len(big_drg) + total_children} total data rows')

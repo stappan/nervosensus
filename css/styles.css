@@ -464,6 +464,7 @@ h1 { color: #2d3748; margin-bottom: 0.5rem; }
 .cd-dl dt { color: #718096; }
 .cd-dl dt.cd-sub { padding-left: 0.75rem; }
 .cd-dl dd { margin: 0; min-width: 0; }
+.cd-predicate { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 0.75rem; color: #a0aec0; word-break: break-all; }
 .cd-cap { text-transform: capitalize; }
 .cd-muted { color: #a0aec0; }
 .cd-mono { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }

@@ -4,7 +4,7 @@ let SOURCES = JSON.parse(JSON.stringify(DEFAULT_SOURCES));
 
 let CELL_TYPES = JSON.parse(JSON.stringify(DEFAULT_CELL_TYPES));
 
-// Helper to check if a cell is a master cell (Bhuiyan 2024 / CSA paper with no species)
+// Helper to check if a cell is a master cell (Bhuiyan et al., 2024 with no species)
 function isMasterCell(ct) {
     if (ct.sourceNomenclatureLabel !== 'Bhuiyan et al., 2024') return false;
     const label = ct.preferredLabel.toLowerCase();
@@ -178,28 +178,58 @@ function parseNPOData(rows) {
     const neurons = {};
     const SOURCE_COLORS = ['#667eea', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
     const sources = {};
-    
-    // First pass: collect all data by neuron
+
+    // Column values by header name, case-insensitive ("union set number" vs "Union set number").
+    const clean = v => {
+        if (v === undefined || v === null) return '';
+        const s = String(v).trim();
+        return s.toLowerCase() === 'none' ? '' : s;
+    };
+    const col = (row, name) => {
+        const key = Object.keys(row).find(k => k.trim().toLowerCase() === name.toLowerCase());
+        return key === undefined ? '' : clean(row[key]);
+    };
+    const npokbByNeuron = {};
+    const firstNidByNpokb = {};
+
+    // First pass: collect all data by neuron. Rows are grouped by npokb ID (later row
+    // blocks for a cell may use a different Neuron ID text), and predicates resolve to
+    // app fields through PREDICATE_MAP (js/predicates.js), the map sync_data.py uses.
     rows.forEach(row => {
-        const neuronId = row['Neuron ID'];
-        const npoProp = row['NPO Property'];
-        const valueLabel = row['Property Value Label'];
-        const valueIri = row['NPO Property Value IRI'];
-        const unionNum = row['Union set number'];
-        const nestNum = row['Nest intersection number'];
-        
+        let neuronId = col(row, 'Neuron ID');
         if (!neuronId) return;
-        
+
+        const npokbId = col(row, 'npokb ID');
+        if (npokbId) {
+            if (!firstNidByNpokb[npokbId]) firstNidByNpokb[npokbId] = neuronId;
+            neuronId = firstNidByNpokb[npokbId];
+            npokbByNeuron[neuronId] = npokbId;
+        }
+
+        if (col(row, 'Proposed action').toLowerCase() === "don't add") return;
+
+        const npoProp = col(row, 'NPO Property');
         if (!neurons[neuronId]) neurons[neuronId] = [];
         neurons[neuronId].push({
-            npo: (npoProp || '').trim(),
-            union: unionNum,
-            nest: nestNum,
-            value: (valueLabel && valueLabel.toLowerCase() !== 'none') ? valueLabel.trim() : '',
-            iri: (valueIri && valueIri.toLowerCase() !== 'none') ? valueIri.trim() : ''
+            npo: npoProp,
+            field: predicateField(npoProp),
+            relation: col(row, 'Relation Type'),
+            union: col(row, 'Union set number'),
+            nest: col(row, 'Nest intersection number'),
+            value: col(row, 'Property Value Label'),
+            iri: col(row, 'NPO Property Value IRI'),
+            modifier: col(row, 'Modifier'),
+            method: col(row, 'determinedByMethod')
         });
     });
-    
+
+    // One source row as stored on the cell's `properties` list (empty fields omitted).
+    const toProperty = p => {
+        const out = { predicate: p.npo };
+        ['relation', 'value', 'iri', 'union', 'nest', 'modifier', 'method'].forEach(k => { if (p[k]) out[k] = p[k]; });
+        return out;
+    };
+
     // Build master rdfsLabel → prefLabel mapping
     const masterRdfsToPref = {};
     const masterPrefLabels = {};
@@ -207,8 +237,8 @@ function parseNPOData(rows) {
         if (!nid.toLowerCase().includes('master')) return;
         let rdfs = '', pref = '';
         props.forEach(p => {
-            if (p.npo === 'rdfs:label') rdfs = p.value;
-            if (p.npo === 'skos:prefLabel') pref = p.value;
+            if (p.field === 'entity') rdfs = p.value;
+            if (p.field === 'preferredLabel') pref = p.value;
         });
         if (rdfs && pref) masterRdfsToPref[rdfs] = pref;
         if (pref) masterPrefLabels[nid] = pref;
@@ -220,7 +250,7 @@ function parseNPOData(rows) {
         if (nid.toLowerCase().includes('master')) return;
         const candidates = [];
         props.forEach(p => {
-            if (p.npo === 'TEMP:subClassOf' && p.value) {
+            if (p.field === 'assertedSubclassOf' && p.value) {
                 const raw = p.value;
                 const normalized = masterRdfsToPref[raw] || raw;
                 const isMaster = masterRdfsToPref.hasOwnProperty(raw);
@@ -232,18 +262,18 @@ function parseNPOData(rows) {
             subclassMap[nid] = masterLinked ? masterLinked.normalized : candidates[0].normalized;
         }
     });
-    
+
     // Collect sources
     Object.entries(neurons).forEach(([nid, props]) => {
         if (nid.toLowerCase().includes('master')) return;
         props.forEach(p => {
-            if (p.npo === 'ilxtr:literatureCitation' && p.iri) {
+            if (p.field === 'sourceNomenclature' && p.iri) {
                 if (!sources[p.iri]) sources[p.iri] = { label: p.value || p.iri, cells: [] };
                 sources[p.iri].cells.push(nid);
             }
         });
     });
-    
+
     const sourceColorMap = {};
     Object.entries(sources).forEach(([url, data], i) => {
         sourceColorMap[url] = {
@@ -252,26 +282,26 @@ function parseNPOData(rows) {
             count: data.cells.length
         };
     });
-    
+
     // Process cells
     const cellTypes = [];
     const geneMap = {};
-    
+
     Object.entries(neurons).forEach(([nid, props]) => {
         if (nid.toLowerCase().includes('master')) return;
-        
+
         let sourceUrl = '', sourceLabel = '';
         props.forEach(p => {
-            if (p.npo === 'ilxtr:literatureCitation' && p.iri) {
+            if (p.field === 'sourceNomenclature' && p.iri) {
                 sourceUrl = p.iri;
                 sourceLabel = p.value || p.iri;
             }
         });
-        
+
         const sourceColor = sourceColorMap[sourceUrl]?.color || '#667eea';
-        
+
         const ct = {
-            entity: '', preferredLabel: '', species: 'unknown',
+            entity: '', preferredLabel: '', localLabel: '', species: 'unknown',
             circuitRole: 'sensory', neurotransmitter: '',
             somaLocation: '', somaLocations: [],
             nerves: [], sensoryTerminalLocations: [], axonTerminalLocations: [],
@@ -292,42 +322,48 @@ function parseNPOData(rows) {
                 fiber_a_beta: false, fiber_a_delta: false, fiber_c: false,
                 species_mouse: false, species_human: false, species_macaque: false, species_guinea_pig: false,
                 soma_drg: false, soma_tg: false
-            }
+            },
+            id: npokbByNeuron[nid] || '',
+            // Every ingested source row for this cell, mapped or not (see js/predicates.js).
+            properties: props.filter(p => p.value || p.iri).map(toProperty)
         };
-        
+
         const geneItems = [], thresholdItems = [], adaptationItems = [], functionalItems = [], axonItems = [];
-        
+
         props.forEach(p => {
-            const npo = p.npo, val = p.value, iri = p.iri;
-            
-            if (npo === 'rdfs:label') ct.entity = val;
-            else if (npo === 'skos:prefLabel') ct.preferredLabel = val;
-            else if (npo === 'ilxtr:hasInstanceInTaxon') {
+            const f = p.field, val = p.value, iri = p.iri;
+            if (!val && !iri) return; // blank template row (no value, no IRI)
+            if (ATTRIBUTE_BY_IRI[iri]) ct.clusterAttributes[ATTRIBUTE_BY_IRI[iri]] = true;
+
+            if (f === 'entity') ct.entity = val;
+            else if (f === 'preferredLabel') ct.preferredLabel = val;
+            else if (f === 'localLabel') ct.localLabel = val;
+            else if (f === 'species') {
                 ct.species = val.toLowerCase();
                 const spKey = 'species_' + val.toLowerCase().replace(/ /g, '_');
                 if (ct.clusterAttributes.hasOwnProperty(spKey)) ct.clusterAttributes[spKey] = true;
             }
-            else if (npo === 'ilxtr:hasCircuitRolePhenotype') ct.circuitRole = val;
-            else if (npo === 'ilxtr:hasNeurotransmitterPhenotype') ct.neurotransmitter = val.trim();
-            else if (npo === 'ilxtr:hasSomaLocatedIn' && val) {
+            else if (f === 'circuitRole') ct.circuitRole = val;
+            else if (f === 'neurotransmitter') ct.neurotransmitter = val.trim();
+            else if (f === 'somaLocations' && val) {
                 if (!ct.somaLocations.includes(val)) ct.somaLocations.push(val);
                 if (val.toLowerCase().includes('dorsal root')) ct.clusterAttributes.soma_drg = true;
                 if (val.toLowerCase().includes('trigeminal')) ct.clusterAttributes.soma_tg = true;
             }
-            else if (npo === 'ilxtr:hasAxonLocatedIn' && val) {
+            else if (f === 'nerves' && val) {
                 if (!ct.nerves.includes(val)) ct.nerves.push(val);
             }
-            else if (npo === 'ilxtr:hasAxonSensorySubcellularElementIn' && val) {
+            else if (f === 'sensoryTerminalLocations' && val) {
                 if (!ct.sensoryTerminalLocations.includes(val)) ct.sensoryTerminalLocations.push(val);
             }
-            else if ((npo === 'ilxtr:hasAxonTerminalIn' || npo === 'ilxtr:hasAxonPresynapticElementIn') && val) {
+            else if (f === 'axonTerminalLocations' && val) {
                 if (!ct.axonTerminalLocations.includes(val)) ct.axonTerminalLocations.push(val);
             }
-            else if (npo === 'ilxtr:hasDriverExpressionConstitutivePhenotype') ct.creLine = val;
-            else if (npo === 'TEMP:mapsTo' || npo === 'ilxtr:mapsTo') {
+            else if (f === 'creLine') ct.creLine = val;
+            else if (f === 'mapsTo') {
                 ct.mapsTo.push({ label: val, iri: iri });
             }
-            else if ((npo === 'ilxtr:hasExpressionPhenotype' || npo === 'ilxtr:hasNucleicAcidExpressionPhenotype') && val) {
+            else if (f === 'markerGenes' && val) {
                 const parts = val.split(' ');
                 const nm = parts[0], exp = parts[1] || '';
                 geneItems.push({ union: p.union, nest: p.nest, display: exp ? nm + '^' + exp : nm });
@@ -337,49 +373,46 @@ function parseNPOData(rows) {
                 if (!geneMap[base]) geneMap[base] = { display: nm, cells: [] };
                 geneMap[base].cells.push(ct.preferredLabel);
             }
-            else if (npo === 'ilxtr:hasAxonPhenotype' && val) {
+            else if (f === 'axonPhenotype' && val) {
+                // Fiber-type flags come from the value IRI (ATTRIBUTE_BY_IRI), not label text.
                 axonItems.push({ union: p.union, nest: p.nest, display: val });
-                const vl = val.toLowerCase();
-                if (vl.includes('beta') || vl.includes('(beta)')) ct.clusterAttributes.fiber_a_beta = true;
-                if (vl.includes('delta') || vl.includes('(delta)')) ct.clusterAttributes.fiber_a_delta = true;
-                if (vl.includes('type c')) ct.clusterAttributes.fiber_c = true;
             }
-            else if ((npo === 'ilxtr:hasThresholdPhenotype' || npo === 'ilxtr:hasPredictedThresholdPhenotype') && val) {
+            else if (f === 'thresholdPhenotype' && val) {
                 thresholdItems.push({ union: p.union, nest: p.nest, display: val });
                 const vl = val.toLowerCase();
                 if (vl.includes('ltm') || vl.includes('low-threshold')) ct.clusterAttributes.mechanosensitive_ltm = true;
                 if (vl.includes('htm') || vl.includes('high-threshold')) ct.clusterAttributes.mechanosensitive_htm = true;
             }
-            else if (npo === 'ilxtr:hasAdaptationPhenotype' && val) {
+            else if (f === 'adaptationPhenotype' && val) {
                 adaptationItems.push({ union: p.union, nest: p.nest, display: val });
                 const vl = val.toLowerCase();
                 if (vl.includes('rapidly') || vl.includes('(ra)')) ct.clusterAttributes.rapidly_adapting = true;
                 if (vl.includes('slowly') || vl.includes('sa1')) ct.clusterAttributes.slowly_adapting = true;
             }
-            else if (npo === 'ilxtr:hasFunctionalPhenotype' && val) {
+            else if (f === 'functionalPhenotype' && val) {
                 functionalItems.push({ union: p.union, nest: p.nest, display: val });
                 const vl = val.toLowerCase();
                 if (vl.includes('cold')) ct.clusterAttributes.cold_sensitive = true;
                 if (vl.includes('heat')) ct.clusterAttributes.heat_sensitive = true;
                 if (vl.includes('proprioceptive')) ct.clusterAttributes.proprioceptive = true;
             }
-            else if (npo === 'alertNote' && val) {
+            else if (f === 'alertNotes' && val) {
                 ct.alertNotes.push(val);
             }
-            else if (npo === 'curatorNote' && val) {
+            else if (f === 'curatorNotes' && val) {
                 ct.curatorNotes.push(val);
             }
-            else if (npo === 'ilxtr:expertConsultant' && val) {
+            else if (f === 'reviewedBy' && val) {
                 if (!ct.reviewedBy.some(r => r.label === val && r.iri === iri)) ct.reviewedBy.push({ label: val, iri: iri || '' });
             }
-            else if (npo === 'ilxtr:dataCitation' && (val || iri)) {
+            else if (f === 'sourceData' && (val || iri)) {
                 ct.sourceData.push({ label: val || iri, uri: iri || '' });
             }
-            else if (npo === 'TEMP:assertedSubClassOf') {
+            else if (f === 'assertedSubclassOf') {
                 ct.assertedSubclassOf.push({ label: val, iri: iri });
             }
         });
-        
+
         // Build strings
         ct.geneExpressionString = geneItems.map(g => g.display).join(' + ');
         ct.fiberTypeString = axonItems.map(a => a.display).join(' + ');
@@ -427,7 +460,7 @@ function parseNPOData(rows) {
     Object.entries(neurons).forEach(([nid, props]) => {
         if (!nid.toLowerCase().includes('master')) return;
         let prefLabel = '';
-        props.forEach(p => { if (p.npo === 'skos:prefLabel') prefLabel = p.value; });
+        props.forEach(p => { if (p.field === 'preferredLabel') prefLabel = p.value; });
         if (!prefLabel) return;
         const children = (masterToChildren[prefLabel] || []).map(c => c.label);
         families.push({ id: String(families.length + 1), name: prefLabel, children });
@@ -1093,7 +1126,7 @@ function renderAlignView() {
         { key: 'species', label: 'Species', type: 'text' },
     ];
 
-    // Find Big DRG paper cells
+    // Find Bhuiyan et al., 2025 cells
     const bigDrgCells = [];
     CELL_TYPES.forEach((ct, idx) => {
         if (ct.sourceNomenclatureLabel === 'Bhuiyan et al., 2025') {
@@ -1101,7 +1134,7 @@ function renderAlignView() {
         }
     });
 
-    // For each Big DRG cell, find all related cells from other sources
+    // For each Bhuiyan et al., 2025 cell, find all related cells from other sources
     const parentRows = [];
     const usedChildIdxs = new Set();
 
@@ -1130,7 +1163,7 @@ function renderAlignView() {
     const sortedRows = [...withChildren, ...withoutChildren];
 
     const totalRelated = sortedRows.reduce((sum, r) => sum + r.children.length, 0);
-    if (countEl) countEl.textContent = bigDrgCells.length + ' Big DRG cells · ' + totalRelated + ' related cells';
+    if (countEl) countEl.textContent = bigDrgCells.length + ' Bhuiyan et al., 2025 cells · ' + totalRelated + ' related cells';
 
     // Source references
     const alignSources = new Set();
@@ -3044,6 +3077,31 @@ function buildPrecisionHTML(ct) {
     }).join(''));
 }
 
+function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Source rows whose predicate has no field mapping in js/predicates.js, grouped by
+// Relation Type, so data the app doesn't otherwise use is still visible.
+function buildAdditionalPropertiesHTML(ct) {
+    const extra = (ct.properties || []).filter(p => !predicateField(p.predicate));
+    if (!extra.length) return '';
+    const groups = new Map();
+    extra.forEach(p => {
+        const key = (p.relation || p.predicate) + '\u0000' + p.predicate;
+        if (!groups.has(key)) groups.set(key, { relation: p.relation || p.predicate, predicate: p.predicate, rows: [] });
+        groups.get(key).rows.push(p);
+    });
+    return [...groups.values()].map(g => {
+        const values = g.rows.map(p => {
+            const text = escapeHtml(p.value || p.iri);
+            const tags = [p.modifier, p.method].filter(Boolean).map(t => `<span class="method-badge">${escapeHtml(t)}</span>`).join('');
+            return `<div>${p.iri ? `<a href="${escapeHtml(p.iri)}" target="_blank" rel="noopener">${text}</a> ↗` : text}${tags}</div>`;
+        }).join('');
+        return cdRow(`${escapeHtml(g.relation)}<div class="cd-predicate">${escapeHtml(g.predicate)}</div>`, values);
+    }).join('');
+}
+
 function buildCellDetailHTML(idx, useLinks) {
     const ct = CELL_TYPES[idx];
 
@@ -3059,6 +3117,7 @@ function buildCellDetailHTML(idx, useLinks) {
     if (ct.creLine) subject += cdRow('Cre line', ct.creLine);
 
     const relRows = buildRelationshipRowsHTML(idx, useLinks);
+    const extraRows = buildAdditionalPropertiesHTML(ct);
 
     let phenotype = '';
     if (ct.markerGenes && ct.markerGenes.length) {
@@ -3088,6 +3147,7 @@ function buildCellDetailHTML(idx, useLinks) {
         (alerts ? `<section><div class="cd-sh">Alert notes</div><div class="cd-notes">${alerts}</div></section>` : '') +
         (reviewers ? `<section><div class="cd-sh">Reviewed by</div><div class="cd-notes">${reviewers}</div></section>` : '') +
         (curator ? `<section><div class="cd-sh">Curator notes</div><div class="cd-notes">${curator}</div></section>` : '') +
+        (extraRows ? `<section><div class="cd-sh">Additional properties</div><dl class="cd-dl">${extraRows}</dl></section>` : '') +
     `</div>`;
 }
 
@@ -3599,7 +3659,7 @@ async function exportAlignDocx() {
                     new D.Paragraph({
                         spacing: { after: 60 },
                         children: [new D.TextRun({
-                            text: `${bigDrgCells.length} Big DRG anchor cells · ${totalRelated} related cells from other sources · Generated ${new Date().toISOString().split('T')[0]}`,
+                            text: `${bigDrgCells.length} Bhuiyan et al., 2025 anchor cells · ${totalRelated} related cells from other sources · Generated ${new Date().toISOString().split('T')[0]}`,
                             size: 18, font: 'Arial', color: '718096', italics: true
                         })]
                     }),

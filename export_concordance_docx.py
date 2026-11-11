@@ -2,9 +2,9 @@
 Export the NervoSensus Cross-Source Concordance table to a Word document.
 
 Usage:
-    python export_concordance_docx.py                          # Big DRG anchor, all other sources
-    python export_concordance_docx.py --anchor "CSA paper"     # CSA anchor, all other sources
-    python export_concordance_docx.py --anchor "big DRG paper" --sources "CSA paper" "Yu et al., 2024"
+    python export_concordance_docx.py                          # Bhuiyan et al., 2025 anchor, all other sources
+    python export_concordance_docx.py --anchor "Bhuiyan et al., 2024"     # Bhuiyan 2024 anchor, all other sources
+    python export_concordance_docx.py --anchor "Bhuiyan et al., 2025" --sources "Bhuiyan et al., 2024" "Yu et al., 2024"
 """
 import json, re, argparse
 from docx import Document
@@ -39,8 +39,8 @@ for c in cells:
         all_sources.append(s)
 
 SOURCE_SHORT = {
-    'big DRG paper': 'Big DRG',
-    'CSA paper': 'CSA',
+    'Bhuiyan et al., 2025': 'Bhuiyan 2025',
+    'Bhuiyan et al., 2024': 'Bhuiyan 2024',
     'Krauter et al., 2025': 'Krauter 2025',
     'Qi et al., 2024': 'Qi 2024',
     'Yu et al., 2024': 'Yu 2024',
@@ -49,8 +49,8 @@ SOURCE_SHORT = {
 }
 
 SOURCE_COLORS = {
-    'CSA paper': 'FF667eea',
-    'big DRG paper': 'FFf59e0b',
+    'Bhuiyan et al., 2024': 'FF667eea',
+    'Bhuiyan et al., 2025': 'FFf59e0b',
     'Krauter et al., 2025': 'FF8b5cf6',
     'Qi et al., 2024': 'FF06b6d4',
     'Yu et al., 2024': 'FFef4444',
@@ -60,7 +60,7 @@ SOURCE_COLORS = {
 
 # ── Parse arguments ──────────────────────────────────────────────────
 parser = argparse.ArgumentParser(description='Export concordance table to Word')
-parser.add_argument('--anchor', default='big DRG paper', help='Anchor source name')
+parser.add_argument('--anchor', default='Bhuiyan et al., 2025', help='Anchor source name')
 parser.add_argument('--sources', nargs='*', default=None, help='Compare sources (default: all other sources)')
 args = parser.parse_args()
 
